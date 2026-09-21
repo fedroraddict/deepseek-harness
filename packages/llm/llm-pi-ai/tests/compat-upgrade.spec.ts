@@ -21,6 +21,10 @@ describe('pi-ai gateway compatibility declarations', () => {
     expect(resolved({ vllmPriority: priority })).toMatchObject({ vllmPriority: priority })
   })
 
+  it('preserves session-affinity routing', () => {
+    expect(resolved({ sendSessionAffinityHeaders: true })).toMatchObject({ sendSessionAffinityHeaders: true })
+  })
+
   it('preserves a disabled Responses output-cap parameter', () => {
     expect(resolved({ supportsMaxOutputTokens: false }, 'openai-responses'))
       .toMatchObject({ supportsMaxOutputTokens: false })
@@ -35,6 +39,7 @@ describe('pi-ai gateway compatibility declarations', () => {
     { thinkingTokenBudgetField: 'unknown' },
     { vllmPriority: 'high' },
     { vllmPriority: 0.5 },
+    { sendSessionAffinityHeaders: 'true' },
     { supportsMaxOutputTokens: 'false' },
     { chatTemplateKwargs: { budget: { $var: 'thinking.unknown' } } },
     { chatTemplateArgs: { budget: { $var: 'thinking.unknown' } } },
@@ -45,6 +50,7 @@ describe('pi-ai gateway compatibility declarations', () => {
   it.each([
     { thinkingTokenBudgetField: 'thinking_budget' },
     { vllmPriority: 0 },
+    { sendSessionAffinityHeaders: true },
     { supportsMaxOutputTokens: false },
   ])('rejects fields on a protocol that cannot consume them: %j', (compat) => {
     expect(() => resolved(compat, 'anthropic-messages')).toThrow(/compat/)
