@@ -272,6 +272,7 @@ const compatProfile: z<PiAiCompatProfile> = z.object({
   supportsStrictMode: z.boolean(),
   cacheControlFormat: z.union(CACHE_CONTROL_FORMATS),
   supportsLongCacheRetention: z.boolean(),
+  sendSessionAffinityHeaders: z.boolean(),
   supportsEagerToolInputStreaming: z.boolean(),
   supportsCacheControlOnTools: z.boolean(),
   supportsTemperature: z.boolean(),

@@ -6,6 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import FileSettingsProvider from '@deepseek-ai/dsh-settings-file'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
@@ -94,6 +95,29 @@ describe('hand-declared providers', () => {
     expect(server.paths).toEqual(['/v1/chat/completions'])
     // The reference resolved through the environment and reached the wire.
     expect(server.headers[0]?.authorization).toBe('Bearer test-key')
+  })
+
+  it('derives configured session affinity from each request session', async () => {
+    const server = await mockServer([
+      { events: textEvents },
+      { events: textEvents },
+      { events: textEvents },
+    ])
+    const ctx = await harness(gateway(`${server.url}/v1`, {
+      compat: { sendSessionAffinityHeaders: true },
+    }))
+
+    for (const sessionId of ['session-a', 'session-a', 'session-b']) {
+      await assemble(ctx, {
+        provider: 'acme-gateway',
+        model: 'acme-large',
+        sessionId: SessionId(sessionId),
+        messages: [],
+      })
+    }
+
+    expect(server.headers.map(headers => headers['x-session-affinity']))
+      .toEqual(['session-a', 'session-a', 'session-b'])
   })
 
   it('lists and resolves the declared models rather than a catalog', async () => {
