@@ -53,6 +53,8 @@ The program is the body of an async Python function. Top-level await and return 
 
 宿主侧校验在不抛异常的情况下丢弃垃圾，因此畸形或伪造帧永远不会让宿主进程崩溃：`validateChildFrame` 对任何不能干净重建的内容返回 `undefined`，非数字的 call id 永远不会被回显进 reply，伪造的额外字段永远不会被带走。非无损 JSON 或超过配置字节预算的完成值会被显式拒绝（`non-lossless`／`over-budget`），而不是被静默取整或截断。原始长度超过有效帧解析上限（64 MiB，或当宿主的配置堆无法安全解析接近上限的帧时更低——见 `hostFrameParseCeiling`）的 fd-3 帧会让本次运行以 `worker-exit` 结算（接收路径在 `toString`/`JSON.parse` 之前限制原始帧，紧凑宽帧不能解码出远超其线上字节的宿主内存）。
 
+Python 执行保留已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)，包括解析后的模式为 `danger-full-access` 时。沙箱提供方必须实施排除，否则拒绝启动。
+
 -----
 
 <a id="understand-the-implementation"></a>

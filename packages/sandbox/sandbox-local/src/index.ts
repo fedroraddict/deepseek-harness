@@ -22,9 +22,9 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { accessSync, constants, statSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, relative, sep, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   LAUNCHER_BIN,
@@ -34,8 +34,8 @@ import {
 } from '@deepseek-ai/node-addon-system/landlock-run'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { SandboxProvider, SandboxUnavailableError, canonicalPath } from '@deepseek-ai/dsh-sandbox'
-import type { ConfinedArgv, ConfinedSandboxMode, RunnerFailureRule, SandboxEnforcement, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import { SandboxProvider, SandboxUnavailableError, canonicalPath, hostSecretDirectories, protectHostSecretDirectory } from '@deepseek-ai/dsh-sandbox'
+import type { ConfinedArgv, SandboxMode, RunnerFailureRule, SandboxEnforcement, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
@@ -43,6 +43,8 @@ import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from './pr
 
 /** Plugin config. All optional — `static Config` supplies the defaults. */
 export interface Config {
+  /** Additional absolute host-only secret directories; model execution cannot read or write them. */
+  secretDirectories?: string[]
   /**
    * Override the runner argv; bwrap-compatible profile arguments are appended. A
    * non-empty override asserts full enforcement and skips built-in selection and
@@ -252,6 +254,7 @@ const RUNNER_FAILURE_RULES = {
 export class LocalSandboxProvider extends SandboxProvider {
   // Inline schema call: the config catalog walks `static Config` statically.
   static Config: z<Config> = z.object({
+    secretDirectories: z.array(z.string()).default([]),
     runnerCommand: z.array(z.string()).default([]),
     runnerFailureSignatures: z.array(z.string()).default([]),
     probeTimeoutMs: z.natural().default(5_000),
@@ -277,6 +280,7 @@ export class LocalSandboxProvider extends SandboxProvider {
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
+    for (const directory of config.secretDirectories as string[]) protectHostSecretDirectory(ctx, directory)
     // The schema (static Config) defaults every field — the casts record
     // those runtime facts. An empty runnerCommand means "not configured":
     // use the platform chain.
@@ -326,14 +330,22 @@ export class LocalSandboxProvider extends SandboxProvider {
     signal?.throwIfAborted()
     policy = { ...policy, workspaceRoot: canonicalPath(policy.workspaceRoot) }
     if (this.runnerCommand !== undefined) {
+      this.assertSecretAncestors(policy)
       return Promise.resolve<ConfinedArgv>({
-        argv: [...this.runnerCommand, ...bwrapProfileArgs(policy), '--', ...argv],
+        argv: [...this.runnerCommand, ...bwrapProfileArgs(policy, hostSecretDirectories(this.ctx)), '--', ...argv],
         enforcement: 'full',
         denialSignatures: DENIAL_SIGNATURES.runnerCommand,
         runnerFailureRules: [{ fatalSignatures: this.configuredRunnerFailureSignatures }],
       })
     }
     const selected = this.selectRunner(policy.mode)
+    if (policy.mode === 'danger-full-access' && selected.runner !== 'bwrap' && selected.runner !== 'seatbelt') {
+      throw new SandboxUnavailableError(policy.mode, `${selected.runner} cannot enforce full access with mandatory exclusions`)
+    }
+    if (hostSecretDirectories(this.ctx).length > 0 && selected.runner !== 'bwrap' && selected.runner !== 'seatbelt') {
+      throw new SandboxUnavailableError(policy.mode, `${selected.runner} cannot exclude host secret directories`)
+    }
+    if (selected.runner === 'bwrap') this.assertSecretAncestors(policy)
     const runnerArgv = this.runnerArgv(selected.runner, policy)
     return Promise.resolve<ConfinedArgv>({
       argv: [...runnerArgv, '--', ...argv],
@@ -343,12 +355,37 @@ export class LocalSandboxProvider extends SandboxProvider {
     })
   }
 
+  /** Reject host credential paths whose ancestors a bwrap process could move outside its masks. */
+  private assertSecretAncestors(policy: SandboxPolicy): void {
+    if (policy.mode === 'read-only') return
+    for (const directory of hostSecretDirectories(this.ctx)) {
+      for (let ancestor = dirname(directory); dirname(ancestor) !== ancestor; ancestor = dirname(ancestor)) {
+        if (policy.mode === 'workspace-write' && (ancestor === policy.workspaceRoot || ancestor === canonicalPath('/tmp'))) break
+        const parent = dirname(ancestor)
+        const suffix = relative(policy.workspaceRoot, parent)
+        if (policy.mode === 'workspace-write' && (suffix === '..' || suffix.startsWith(`..${sep}`))) continue
+        let mutable = false
+        try {
+          mutable = statSync(parent).uid === process.getuid?.()
+          accessSync(parent, constants.W_OK)
+          mutable = true
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code
+          if (code !== 'EACCES' && code !== 'EPERM' && code !== 'ENOENT' && code !== 'ENOTDIR') throw error
+        }
+        if (mutable) {
+          throw new SandboxUnavailableError(policy.mode, 'cannot protect a host secret beneath a mutable ancestor; use a dedicated credential directory')
+        }
+      }
+    }
+  }
+
   /** The selected rung's runner invocation (program + profile arguments) for one policy. */
   private runnerArgv(runner: SelectedRunner['runner'], policy: SandboxPolicy): string[] {
     switch (runner) {
-      case 'bwrap': return ['bwrap', ...bwrapProfileArgs(policy)]
+      case 'bwrap': return ['bwrap', ...bwrapProfileArgs(policy, hostSecretDirectories(this.ctx))]
       case 'landlock': return [this.landlockLauncher(), ...landlockProfileArgs(policy)]
-      case 'seatbelt': return [this.seatbeltExec(), ...seatbeltProfileArgs(policy)]
+      case 'seatbelt': return [this.seatbeltExec(), ...seatbeltProfileArgs(policy, hostSecretDirectories(this.ctx))]
       case 'windows-acl': return this.windowsAclRunnerArgv(policy)
       default: return assertNever(runner)
     }
@@ -500,7 +537,7 @@ export class LocalSandboxProvider extends SandboxProvider {
    * functional probes in chain order. Fail closed when the platform has no
    * chain or no candidate passes — the command never runs.
    */
-  private selectRunner(mode: ConfinedSandboxMode): SelectedRunner {
+  private selectRunner(mode: SandboxMode): SelectedRunner {
     this.selectedRunner ??= this.chainVerdict()
     if (this.selectedRunner === 'unavailable') throw new SandboxUnavailableError(mode)
     return this.selectedRunner

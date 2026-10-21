@@ -15,6 +15,7 @@
  * @module
  */
 
+import { assertNoHostSecretExclusions } from '@deepseek-ai/dsh-sandbox'
 import { Client, type Transport } from '@modelcontextprotocol/client'
 import type { Context } from '@deepseek-ai/cordis'
 import { assertNever, type JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -125,6 +126,7 @@ export interface ConnectionHandle extends ServerContext {
  * @returns Handle with a `ready` promise for startup-await and a `dispose` for teardown.
  */
 export function startConnection(ctx: Context, config: Config, policy: ResolvedReconnectPolicy): ConnectionHandle {
+  if (config.transport === 'stdio') assertNoHostSecretExclusions(ctx, 'MCP stdio transport')
   const label = `mcp-client(${config.serverName})`
   const incompleteDisposalMessage = `${label}: transport closure could not be confirmed during disposal — server shutdown may be incomplete`
   const opts: ToolBridgeOptions = {

@@ -47,6 +47,8 @@ kind: "package-reference"
 
 将验证后的 `ctx.ssh.ptcLaunch` 作为 [`NodePtcRuntime`](../../ptc-runtime/ptc-runtime-node/README.zh.md) 的 `launch` 配置。可执行文件部署包含 worker；脚本部署使用 PTC 时需要两个引导字段，仅使用文件系统和 Bash 时可以省略。脚本引导未配置时，getter 会拒绝访问。客户端在就绪前拒绝不匹配的协议版本、运行形式和 helper 摘要。
 
+helper 的策略解析器保留可选的 `preserveHostTemp` 标志。该标志为 true 时，Bubblewrap 为固定的文件系统操作保留宿主临时文件视图；其他后端保留现有的临时目录行为。
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -87,6 +87,8 @@ This package contributes no prompt text. Its consumers own the appended tool res
 - **Filtered representations** — checkout skips configured filters to avoid executing repository-configured programs or triggering implicit downloads. Git LFS pointers and encrypted blobs stay in their stored representation; hydration or decryption is a separate user-controlled operation.
 - **Execution requirements** — the subprocess provider must offer Git and Node in the same execution world as the filesystem provider. Git must honor `GIT_NO_LAZY_FETCH`, which Git 2.45 and the 2.39.4, 2.40.2, 2.41.1, 2.42.2, 2.43.4, and 2.44.1 maintenance releases do; older releases ignore it and proceed instead of failing, so creation can fetch missing partial-clone objects from a promisor remote. The `git --no-lazy-fetch` option would reject these releases, but it exists only in Git 2.45 and later and also rejects the patched maintenance releases. The existing sandbox must permit all checkout and shared Git metadata writes.
 
+Worktree subprocesses retain [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) in every sandbox mode, including full access; an unsupported backend refuses the command before startup.
+
 <a id="dev-note"></a>
 ### Dev Note
 

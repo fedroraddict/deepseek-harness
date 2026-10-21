@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import Lsp, { type LspProvider, type LspQueryRequest, type LspQueryResult } from '@deepseek-ai/dsh-lsp'
+import { protectHostSecretDirectory } from '@deepseek-ai/dsh-sandbox'
 import { deadline } from '@deepseek-ai/dsh-timeout'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
@@ -79,6 +80,19 @@ function locationJson(line: number): unknown {
 }
 
 describe('lsp-stdio end to end over a fake server', () => {
+  it('refuses language servers before spawn when host secrets are protected', async () => {
+    const vault = join(root, 'vault')
+    await mkdir(vault)
+    const ctx = await mount({}, {}, undefined, mounted => protectHostSecretDirectory(mounted, vault))
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    try {
+      await expect(ctx.lsp.query(query('hover'))).rejects.toThrow(/host-secret exclusions/)
+      expect(spawn).not.toHaveBeenCalled()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('routes different extensions to independent configured servers', async () => {
     await writeFile(join(ws, 'a.py'), 'x = 1\n')
     const ctx = new Context()

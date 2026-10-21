@@ -95,6 +95,8 @@ Nothing here enters a model request, so provider cache reuse is unaffected.
 - A comparison that degrades to whole-file replacement carries every line of both sides, up to twice `maxFileBytes`.
 - Windows paths keep native separators in `path`; `display` is always slash-separated.
 
+Git snapshots are unavailable when [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) are configured: repository filters and helpers cannot run without mandatory confinement. File-tool captures remain available.
+
 <a id="dev-note"></a>
 ### Dev Note
 

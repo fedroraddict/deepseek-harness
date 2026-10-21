@@ -14,10 +14,9 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import type { ShellExecRequest, ShellExecSpec, ShellExecution, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
-import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
+import { SandboxUnavailableError, hostSecretExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type {
   ConfinedArgv,
-  ConfinedSandboxMode,
   RunnerFailureRule,
   SandboxEnforcement,
   SandboxExecutionPolicy,
@@ -64,7 +63,7 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
    * Unconfined processes have no entry.
    */
   private readonly processFacts = new Map<ShellProcess, {
-    mode: ConfinedSandboxMode
+    mode: SandboxMode
     enforcement: SandboxEnforcement
     denialSignatures: readonly string[]
     runnerFailureRules: readonly RunnerFailureRule[]
@@ -96,7 +95,8 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
   override async execute(spec: ShellExecSpec): Promise<ShellExecution> {
     const policy = spec.sandboxPolicy as SandboxExecutionPolicy
     const { mode } = policy
-    if (mode === 'danger-full-access') {
+    const confinement = hostSecretExecutionPolicy(this.ctx, policy)
+    if (confinement === undefined) {
       return SandboxPwshExecutor.decorateResult(
         await super.execute(spec),
         result => ({ ...result, sandbox: { mode, denied: false } }),
@@ -126,14 +126,14 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
       // the matched fatal line, not an informational line that preceded it.
       const runnerFailure = classifyRunnerFailure(result.exitCode, result.stderr.text, runnerFailureRules)
       if (runnerFailure !== undefined) {
-        throw new SandboxUnavailableError(mode, runnerFailure.detail)
+        throw new SandboxUnavailableError(confinement.mode, runnerFailure.detail)
       }
       return { ...result, sandbox: { mode, denied: classifyDenial(result, denialSignatures), enforcement } }
     }, (error) => {
       // An upstream abort remains cancellation even when it prevents spawn.
       if (spec.signal?.aborted === true) spec.signal.throwIfAborted()
       if (confined !== undefined && isRunnerSpawnFailure(error, confined.argv[0], spec.workdir)) {
-        throw new SandboxUnavailableError(mode, String(error))
+        throw new SandboxUnavailableError(confinement.mode, String(error))
       }
       throw error
     })

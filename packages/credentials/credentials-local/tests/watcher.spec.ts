@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -257,7 +257,7 @@ describe('watcher pipeline', () => {
       expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'b', source: 'file' })
     })
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring unknown top-level'), '"FOREIGN"', path)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring unknown top-level'), '"FOREIGN"', await realpath(path))
 
     // An event that finds the same text publishes and reports nothing again.
     instance!.watcher.emit('all', 'change', path)

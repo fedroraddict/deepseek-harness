@@ -29,6 +29,8 @@ kind: "package-reference"
 
 传入完整的 `read-only` 或 `workspace-write` 策略。工作区路径在远端主机解释并规范化。消费方在 `danger-full-access` 模式下绕过 `confine()`；连接不额外引入本地／远端策略标记。
 
+本提供方会拒绝已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)，因为 SSH 协议不传输执行环境的排除登记表。它不会宣称远程 argv 能保护调用方的秘密目录。
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -56,6 +56,14 @@ kind: "package-reference"
 
 不受支持的平台或不可用的 runner 会拒绝执行：`confine()` 以 `SANDBOX_UNAVAILABLE` 拒绝 并列出该平台的 runner 选项，消费方会呈现该错误，而不是让命令不受限制地运行。启动后拒绝自身 profile 的 runner 由其致命 stderr 签名与退出码识别，因此损坏的沙箱不会被误认为被拒绝的命令。`runnerCommand` 覆盖是操作方断言：它跳过功能探测，并假定配置的 runner 诚实实现与 bwrap 兼容的 profile。
 
+### 保护宿主凭据
+
+`secretDirectories` 默认为 `[]`。启用保护前，先将凭据文档及其原子写入暂存文件放入现有的专用目录，将凭据提供方的 `path` 指向该文档，并将目录加入本提供方的 `secretDirectories`。不要填写整个 harness 主目录：profile、依赖和其他运行时文件必须位于受保护目录之外。此配置不会移动现有凭据。[沙箱服务](../sandbox/README.zh.md#host-secret-exclusions) 负责登记生命周期和提供方要求。
+
+沙箱 Bash 和 PowerShell 执行器、持久 shell 终端、单次及持久 Node PTC、Python PTC、本地文件系统操作和 grep/glob 在所有模式下保留这些排除项。文件系统流式读取使用带背压的工作进程管道。批准 `danger-full-access` 不会暴露受保护目录。普通宿主子进程消费者保留现有 API 和权限。外部子代理、本地 MCP stdio 服务器、stdio 语言服务器、工作区变更摘要 Git 命令和 SSH 沙箱转发因无法传递这些排除项而被拒绝。
+
+Bubblewrap 在工作区挂载后遮蔽每个秘密目录；Seatbelt 禁止读写、删除祖先目录以及检查其他进程。若策略允许移动受保护目录的祖先，Bubblewrap 会拒绝执行，包括位于用户可写祖先下的完全访问。Landlock 和 Windows ACL 运行器无法实现这些读取排除，配置保护后会安全拒绝。自定义运行器必须遵守附加的 Bubblewrap profile。将此配置视为凭据保管保障前，必须验证实际选中的提供方和运行时布局。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,7 +80,7 @@ kind: "package-reference"
 
 ### 平台 profile
 
-bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。[历史私有 PID 笔记](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md)记录该边界。 私有进程与设备挂载在工作区绑定后应用；根工作区的临时 `/tmp` 也在根绑定后挂载。
+除完全访问模式外，bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。[历史私有 PID 笔记](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md)记录该边界。 `preserveHostTemp: true` 为文件系统工作进程保留宿主临时文件视图，而不遮蔽 `/tmp`；其他后端保留现有的临时目录行为。私有进程与设备挂载在工作区绑定后应用；根工作区的临时 `/tmp` 也在根绑定后挂载。
 
 `@deepseek-ai/node-addon-system/landlock-run` API 提供平台 launcher、功能探测与授权词汇；此提供方只做模式到授权的映射，把路径解析与探测解析保留在带版本的 binary 中。
 

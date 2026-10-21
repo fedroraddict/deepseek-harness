@@ -49,6 +49,8 @@ The effective mode comes from the calling session's override or escalation grant
 
 Reads, listings, metadata, and read-only watches work exactly as with `fs-local`; the mutation fence does not restrict observation. A denied mutation returns an `FS_SANDBOX_DENIED` error carrying the effective mode; through the tools the model sees `[sandbox: file access denied under <mode> mode]` plus the one-approved-wider retry hint, identical to bash's denials. A session with an approved escalation may retry the same operation at a strictly wider mode for that one call.
 
+Registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) apply to reads and mutations through the inherited local provider, including under `danger-full-access`.
+
 -----
 
 <a id="understand-the-implementation"></a>

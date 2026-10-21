@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
@@ -32,10 +33,10 @@ afterEach(async () => {
 })
 
 // The local sandbox's POSIX kernel runners are covered here; Windows ACL enforcement has its own native lane.
-// Source-tree repositories stay outside the temporary directories independently writable under workspace-write.
+// Home-directory fixtures stay outside the temporary directories independently writable under workspace-write.
 describe.skipIf(!sandboxUsable)('worktree standing sandbox policy', () => {
   it('refuses creation under read-only policy without changing the Session directory', async () => {
-    root = await repository(process.cwd())
+    root = await repository(homedir())
     const pool = join(root, '.agents', 'worktrees')
     await mkdir(pool, { recursive: true })
     ctx = await harness(root, {}, 'read-only')
@@ -50,7 +51,7 @@ describe.skipIf(!sandboxUsable)('worktree standing sandbox policy', () => {
   })
 
   it('creates an unfiltered checkout in the default pool under the source workspace-write grant', async () => {
-    root = await repository(process.cwd())
+    root = await repository(homedir())
     await writeFile(join(root, '.gitattributes'), '*.txt filter=configured -text\n')
     await git(root, 'add', '.gitattributes')
     await git(root, 'commit', '-m', 'attributes')
@@ -75,7 +76,7 @@ describe.skipIf(!sandboxUsable)('worktree standing sandbox policy', () => {
   })
 
   it('does not widen a linked-checkout grant to the shared Git administration directory', async () => {
-    root = await repository(process.cwd())
+    root = await repository(homedir())
     const linked = join(root, 'linked')
     await git(root, 'worktree', 'add', '-b', 'linked', linked)
     ctx = await harness(linked, {}, 'workspace-write')

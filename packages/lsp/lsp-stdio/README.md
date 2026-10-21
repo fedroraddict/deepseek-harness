@@ -148,6 +148,8 @@ These limits define when the provider is a poor fit or needs special operational
 - **Per-server and per-workspace serialization latency** — parallel agents sharing one server and workspace queue behind one process; long-lived workspace processes consume memory until disposal.
 - **A hard-killed harness orphans language servers** — `initialize.processId: null` removes server-side client-PID monitoring, so servers are cleaned only by graceful service disposal; a SIGKILL'd harness leaves them running until they exit on their own.
 
+Queries are refused before filesystem access or server startup when [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) are configured. Language servers may execute project plugins and do not yet carry mandatory confinement.
+
 <a id="dev-note"></a>
 ### Dev Note
 

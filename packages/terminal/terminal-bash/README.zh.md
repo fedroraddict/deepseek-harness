@@ -73,6 +73,8 @@ shell 在整个生命周期内运行在有效的沙箱边界之下。当所有�
 
 打开会返回会话 id 与有界启动消息。发送以四种等待原因之一与一个会话状态结算；`session_exit` 表示顶层 shell 已退出。设置失败会拒绝打开：受限模式下缺少沙箱提供方、shell 在启动期间退出、shell 未能在启动超时前达到就绪，或调用方取消。清理失败会拒绝关闭，而不是声称成功。
 
+每个持久终端在进程启动时保留已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)，包括 `danger-full-access` 模式。必须在创建任何终端前登记受保护目录；运行中的进程无法获得后续排除项。
+
 -----
 
 <a id="understand-the-implementation"></a>

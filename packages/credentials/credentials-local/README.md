@@ -121,6 +121,8 @@ Only your OS user can read the file: the product creates it with owner-only perm
 - **The store refuses to load a file it cannot trust** — a file any other user can read, malformed YAML, or an unreachable path fails at startup; on a live reload the last good content keeps serving with a warning.
 - **Changes made at the same time are both kept** — if you edit the file while the product writes, your change is folded in rather than overwritten.
 
+Initialization pins the credential document’s canonical parent directory. Retargeting a configured directory alias afterward cannot redirect reads, rotations, locks, or atomic-write staging to another directory. Diagnostics identify the pinned canonical path.
+
 -----
 
 <a id="understand-the-implementation"></a>

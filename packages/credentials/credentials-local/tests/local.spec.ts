@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -329,7 +329,7 @@ describe('document validation', () => {
     await fiber
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'sk-file', source: 'file' })
     expect(await ctx.credentials.resolve(credentialRef('GITLAB_TOKEN'))).toBeUndefined()
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring unknown top-level'), '"GITLAB_TOKEN", "ACCOUNT_ID"', path)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring unknown top-level'), '"GITLAB_TOKEN", "ACCOUNT_ID"', await realpath(path))
     expect(JSON.stringify(warn.mock.calls)).not.toContain('glpat-secret')
     await ctx.credentials.set(OTHER, 'sk-other')
     expect(await readFile(path, 'utf8')).toBe(

@@ -27,8 +27,11 @@
   en: 7282c9ec77fd6f01
   zh: 10e385a9489105e3
 /deepseek-ai-dsh-sandbox-local/use-this-package/failures-and-recovery:
-  en: 3808edb37dde5761
-  zh: a8fef8a4fd33e364
+  en: e08a3f9bda292006
+  zh: b244b755468f7722
+/deepseek-ai-dsh-sandbox-local/use-this-package/protecting-host-credentials:
+  en: bb963ba49c9d6262
+  zh: 7331b9695a8193d1
 /deepseek-ai-dsh-sandbox-local/understand-the-implementation:
   en: 15db6ec303151ccc
   zh: 91f62c1f64192f92
@@ -36,8 +39,8 @@
   en: f0c44248c2ca6acc
   zh: 554e9f706671d222
 /deepseek-ai-dsh-sandbox-local/understand-the-implementation/platform-profiles:
-  en: c08edc22784423dc
-  zh: 8ca3e20bcfae924a
+  en: d72c736ef87e7f83
+  zh: 7a3b1b204dc06209
 /deepseek-ai-dsh-sandbox-local/understand-the-implementation/denial-and-runner-failure-dialects:
   en: 62adfc9229c656cc
   zh: 11b1534b6d61e5de

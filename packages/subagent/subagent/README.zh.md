@@ -72,6 +72,8 @@ kind: "package-reference"
 
 缺少 `agents` 服务时，启动请求以 `CONTINUATION_UNAVAILABLE` 拒绝；运行时可用但父级缺失或被替换时，以 `UNAUTHORIZED` 拒绝。未实现任何执行方法的提供方会在注册时以 `UNSUPPORTED_CAPABILITY` 被拒绝；请求不受支持的能力会以同一码使创建失败。调用方信号仅取消尚未发布的工作；发布后通过 `dispose()` 取消该次 activation，并等待其后代（包括正在启动的后代）及其资源清理完成。`result` 在清理与通知结束后完成，携带输出、可选结构化数据与停止原因；结果捕获故障在清理后使其拒绝。清理失败使 `dispose()` 拒绝，并将生命周期结束事件标记为失败；结果 promise 与父级通知保留已捕获的执行结果。
 
+登记[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)后，外部提供方在启动前会被拒绝，因为其子进程不继承应用的凭据保管策略。可继续的进程内提供方共享应用的保护。本包需要运行时 peer 依赖 `@deepseek-ai/dsh-sandbox`。
+
 -----
 
 <a id="understand-the-implementation"></a>

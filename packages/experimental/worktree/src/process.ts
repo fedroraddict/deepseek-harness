@@ -1,7 +1,7 @@
 /** Bounded, cancellable commands under the calling Session's existing file policy. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
+import { hostSecretExecutionPolicy, type SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SubprocessCollectedOutputs } from '@deepseek-ai/dsh-subprocess'
 import { deadline } from '@deepseek-ai/dsh-timeout'
 
@@ -49,9 +49,10 @@ export async function runCommand(
   timeout.signal.throwIfAborted()
   const program = await ctx.subprocess.resolveExecutable(argv[0], undefined, timeout.signal)
   const command = [program, ...argv.slice(1)]
-  const wrapped = policy.mode === 'danger-full-access'
+  const confinement = hostSecretExecutionPolicy(ctx, policy)
+  const wrapped = confinement === undefined
     ? command
-    : (await ctx.sandbox.confine(command, { ...policy, mode: policy.mode }, timeout.signal)).argv
+    : (await ctx.sandbox.confine(command, confinement, timeout.signal)).argv
   timeout.signal.throwIfAborted()
   const child = ctx.subprocess.spawn({
     argv: wrapped,

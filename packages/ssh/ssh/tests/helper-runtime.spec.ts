@@ -107,6 +107,9 @@ describe.skipIf(process.platform === 'win32')('SSH helper runtime', () => {
       const wrapped = await test.client.request('sandbox', { argv: ['true'], policy: policy(test.root) }, z.looseObject({ argv: z.array(z.string()), enforcement: z.enum(['full', 'partial']) }))
       expect(wrapped.argv).toEqual(['confined', 'true'])
       expect(confine).toHaveBeenCalledWith(['true'], policy(test.root), expect.any(AbortSignal))
+      await test.client.request('sandbox', { argv: ['true'], policy: { ...policy(test.root), preserveHostTemp: true } }, z.unknown())
+      expect(confine).toHaveBeenLastCalledWith(['true'], { ...policy(test.root), preserveHostTemp: true }, expect.any(AbortSignal))
+      await expect(test.client.request('sandbox', { argv: ['true'], policy: { ...policy(test.root), preserveHostTemp: 'invalid' } }, z.unknown())).rejects.toThrow()
     } finally { resolveExecutable.mockRestore(); confine.mockRestore(); await test.close() }
   })
 })

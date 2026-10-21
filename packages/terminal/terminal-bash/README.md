@@ -73,6 +73,8 @@ The shell runs under the effective sandbox boundary for its whole life. Changing
 
 An open returns the session id and a bounded startup message. Sends settle with one of the four wait reasons and a session status; `session_exit` means the top-level shell exited. Setup failures reject the open: a missing sandbox provider in a confined mode, a shell that exits during startup, a shell that fails to reach readiness before the startup timeout, or caller cancellation. Cleanup failures reject the close instead of claiming success.
 
+Each persistent terminal retains registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) at process startup, including under `danger-full-access`. Register protected directories before creating any terminal; the running process cannot acquire later exclusions.
+
 -----
 
 <a id="understand-the-implementation"></a>

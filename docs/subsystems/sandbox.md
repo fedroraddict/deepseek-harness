@@ -8,22 +8,22 @@ Source: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox
 
 ## Modes and enforcement
 
-`SandboxMode` governs filesystem effects only. `read-only` asks the backend to deny writes — the POSIX runners additionally grant the `/dev/null` sink their shells require, while the Windows ACL runner grants no explicit writable root and reports partial enforcement for its ambient ACL gaps; `workspace-write` permits writes under the workspace root and the backend's promised temp area; `danger-full-access` bypasses confinement. Network and process visibility are outside this vocabulary.
+`SandboxMode` governs filesystem effects only. `read-only` asks the backend to deny writes — the POSIX runners additionally grant the `/dev/null` sink their shells require, while the Windows ACL runner grants no explicit writable root and reports partial enforcement for its ambient ACL gaps; `workspace-write` permits writes under the workspace root and the backend's promised temp area; `danger-full-access` bypasses mode restrictions while retaining mandatory host-secret exclusions. Network and process visibility are otherwise outside this vocabulary.
 
 ```ts type-equiv
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses mode confinement. Mandatory
+ * host-secret exclusions still apply. Network and process visibility are otherwise outside this vocabulary.
  */
 type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 ```
 
-Only the first two modes can be sent to a provider. A `danger-full-access` consumer spawns its original argv and does not call `ctx.sandbox`.
+A consumer calls the provider under `danger-full-access` when [host-secret exclusions](../../packages/sandbox/sandbox/README.md#host-secret-exclusions) are registered; the provider must retain those exclusions or reject execution. Without registered exclusions, a full-access consumer spawns its original argv.
 
 ```ts type-equiv
-/** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
+/** A mode that restricts file writes independently of mandatory host-secret exclusions. */
 type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
 ```
 
@@ -53,6 +53,8 @@ interface SandboxExecutionPolicy {
   mode: SandboxMode
   /** Absolute root directory `workspace-write` may write under. */
   workspaceRoot: string
+  /** Keep host temporary files visible; workspace-write then grants only its explicit root on Bubblewrap. */
+  preserveHostTemp?: boolean
   /**
    * Opaque identity of the calling session (the branded `dsh-session`
    * SessionId). Backends key per-session state off it (e.g. windows-acl gives
@@ -76,7 +78,7 @@ interface SandboxPolicyRequest {
 }
 ```
 
-Only a confined execution reaches `ctx.sandbox`; its provider policy narrows the mode while retaining the same root. This permits concurrent sessions, consumers, and one-shot escalated retries to ask the same provider for different boundaries without mutating provider state.
+A provider receives the resolved mode and root, including full access when mandatory exclusions require a runner. This permits concurrent sessions, consumers, and one-shot escalated retries to ask the same provider for different boundaries without mutating provider state.
 
 ```ts type-equiv
 /**
@@ -87,10 +89,7 @@ Only a confined execution reaches `ctx.sandbox`; its provider policy narrows the
  * new call with a wider policy. Defaulting/resolution is an explicit step at
  * the consumer boundary; the provider treats the policy as fully specified.
  */
-interface SandboxPolicy extends SandboxExecutionPolicy {
-  /** The file-effect mode this execution runs under. */
-  mode: ConfinedSandboxMode
-}
+type SandboxPolicy = SandboxExecutionPolicy
 ```
 
 <a id="wrapped-argv-and-classification-dialects"></a>

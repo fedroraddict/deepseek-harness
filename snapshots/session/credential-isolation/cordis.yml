@@ -1,0 +1,25 @@
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+  config:
+    path: !!js process.cwd() + '/vault/credentials.yaml'
+    watch: false
+
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+  config:
+    secretDirectories:
+      - !!js process.cwd() + '/vault'
+
+# The read-tool presentation does not load workspace instructions or skill inventories.
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill-filesystem
+  disabled: true
+
+- id: tool-skill
+  disabled: true
+
+- id: skill
+  disabled: true

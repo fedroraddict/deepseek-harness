@@ -85,9 +85,6 @@
     "@deepseek-ai/dsh-permission-presets": {
       "optional": true
     },
-    "@deepseek-ai/dsh-sandbox": {
-      "optional": true
-    },
     "@deepseek-ai/dsh-sandbox-policy": {
       "optional": true
     },

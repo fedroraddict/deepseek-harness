@@ -1,7 +1,8 @@
 /** Git working-tree snapshots, tree diffs, and ignore checks through the subprocess capability. */
 import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
-import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import type { Context } from '@deepseek-ai/cordis'
+import { assertNoHostSecretExclusions } from '@deepseek-ai/dsh-sandbox'
 import { parseNumstat, type NumstatEntry } from './numstat.ts'
 import { canonicalPath, isInside, toPosix } from './paths.ts'
 
@@ -40,7 +41,7 @@ export interface GitLimits {
 /** Runs one resolved git executable with scrubbed environment, timeout, and bounded output. */
 export class GitRunner {
   constructor(
-    private readonly subprocess: SubprocessRuntime,
+    private readonly ctx: Context,
     private readonly executable: string,
     private readonly limits: GitLimits,
   ) {}
@@ -53,9 +54,10 @@ export class GitRunner {
    * @throws when the command times out, is aborted, or cannot spawn.
    */
   async run(args: readonly string[], options: GitRunOptions): Promise<GitRunResult> {
+    assertNoHostSecretExclusions(this.ctx, 'workspace change-summary Git')
     const timeout = AbortSignal.timeout(this.limits.timeoutMs)
     const signal = AbortSignal.any([options.signal, timeout])
-    const handle = this.subprocess.spawn({
+    const handle = this.ctx.subprocess.spawn({
       argv: [this.executable, ...args],
       cwd: options.cwd,
       stdio: {

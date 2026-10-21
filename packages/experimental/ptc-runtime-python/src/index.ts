@@ -22,7 +22,7 @@ import { PtcRuntime, DUNDER_MEMBER, PORTABLE_RESERVED_WORDS, RESERVED_BINDING_GL
 import type { PtcBindingErrorClass, PtcBindingFunction, PtcJsonValue, PtcRunFailure, PtcRunRequest, PtcRunResult, PtcRunSandbox, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import { snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure } from '@deepseek-ai/dsh-sandbox'
+import { SandboxUnavailableError, hostSecretExecutionPolicy, classifyRunnerFailure, isRunnerSpawnFailure } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { bootstrapInput, PYTHON_BOOTSTRAP_LOADER } from './launch.ts'
@@ -1026,15 +1026,16 @@ export class PythonPtcRuntime extends PtcRuntime {
       let confined: ConfinedArgv | undefined
       // Unbuffered native output stays observable before process-group teardown.
       let argv: [string, ...string[]] = [this.pythonBin, '-u', '-I', '-c', PYTHON_BOOTSTRAP_LOADER]
-      if (policy.mode !== 'danger-full-access') {
-        confined = await this.ctx.sandbox.confine(argv, { ...policy, mode: policy.mode }, controller.signal)
+      const confinement = hostSecretExecutionPolicy(this.ctx, policy)
+      if (confinement !== undefined) {
+        confined = await this.ctx.sandbox.confine(argv, confinement, controller.signal)
         controller.signal.throwIfAborted()
         sandbox.enforcement = confined.enforcement
         // The launcher uses the deployment PATH; model code still receives only TMPDIR.
         const runner = confined.argv[0]
-        if (runner === undefined) throw new SandboxUnavailableError(policy.mode, 'sandbox runner argv is empty')
+        if (runner === undefined) throw new SandboxUnavailableError(confinement.mode, 'sandbox runner argv is empty')
         const executable = resolvePythonBin(runner)
-        if (executable === undefined) throw new SandboxUnavailableError(policy.mode, `sandbox runner is not executable: ${confined.argv[0]}`)
+        if (executable === undefined) throw new SandboxUnavailableError(confinement.mode, `sandbox runner is not executable: ${confined.argv[0]}`)
         argv = [executable, ...confined.argv.slice(1)]
         confined = { ...confined, argv }
       }

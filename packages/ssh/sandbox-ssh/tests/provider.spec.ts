@@ -1,6 +1,9 @@
 /** Each confinement request resolves remotely before any subprocess receives its argv. */
 import { Context, Service } from '@deepseek-ai/cordis'
-import { SandboxUnavailableError, type SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import { SandboxUnavailableError, protectHostSecretDirectory, type SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { z } from 'zod'
 import { SshSandboxProvider } from '../src/index.ts'
@@ -27,6 +30,15 @@ async function setup(raw: unknown = completeFacts) {
 }
 
 describe('SSH sandbox provider', () => {
+  it('refuses exclusions that its remote protocol cannot transmit', async () => {
+    const state = await setup()
+    const vault = await mkdtemp(join(tmpdir(), 'dsh-ssh-secrets-'))
+    onTestFinished(() => rm(vault, { recursive: true, force: true }))
+    protectHostSecretDirectory(state.ctx, vault)
+    await expect(state.ctx.sandbox.confine(['true'], policy)).rejects.toThrow(/host-secret exclusions/)
+    expect(state.dispatch).not.toHaveBeenCalled()
+  })
+
   it('awaits remote policy resolution and returns the literal enforcing argv', async () => {
     const state = await setup()
     const result = Promise.withResolvers<typeof completeFacts>()

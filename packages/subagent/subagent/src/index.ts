@@ -29,6 +29,7 @@
  */
 import type { Volatile } from '@deepseek-ai/cordis'
 
+import { assertNoHostSecretExclusions } from '@deepseek-ai/dsh-sandbox'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-working-directory'
@@ -278,6 +279,7 @@ export class SubagentRuntime extends TypertRemoteService {
       throw new SubagentError('subagent creation requires the exact live parent agent', 'UNAUTHORIZED')
     }
     if (spec.request.outputSchema !== undefined) assertObjectJsonSchema(spec.request.outputSchema)
+    if (provider.prepareContinuable === undefined) assertNoHostSecretExclusions(this.ctx, 'External subagent providers')
     return provider.prepareContinuable === undefined
       ? manager.startExternal(spec)
       : manager.startLocal(spec)

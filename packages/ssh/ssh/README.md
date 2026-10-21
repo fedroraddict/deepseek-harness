@@ -47,6 +47,8 @@ Install an [SSH helper executable archive](../ssh-helper-runtime/README.md), or 
 
 Pass the verified `ctx.ssh.ptcLaunch` as the `launch` configuration of [`NodePtcRuntime`](../../ptc-runtime/ptc-runtime-node/README.md). Executable deployments include their worker. Script deployments require both bootstrap fields for PTC; filesystem and Bash use may omit them. The getter refuses an unconfigured script bootstrap. The client rejects mismatched protocol versions, runtime kinds and helper digests before readiness.
 
+The helper’s policy parser preserves the optional `preserveHostTemp` flag. Bubblewrap retains host temporary files for fixed filesystem operations when this flag is true; other backends retain their existing temporary-directory behavior.
+
 -----
 
 <a id="understand-the-implementation"></a>

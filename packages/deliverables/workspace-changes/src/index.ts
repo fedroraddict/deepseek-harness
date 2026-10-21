@@ -125,7 +125,7 @@ export function apply(ctx: Context, config: Config): void {
         ctx.logger.info('workspace-changes: git is unavailable; only file-tool edits are summarized')
         return null
       }
-      return new GitRunner(ctx.subprocess, executable, { timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes })
+      return new GitRunner(ctx, executable, { timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes })
     })
     return runner
   }

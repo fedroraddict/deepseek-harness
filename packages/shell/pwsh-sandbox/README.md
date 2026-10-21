@@ -63,6 +63,8 @@ A denied command is reported as a fact: the result carries `sandbox: { mode, den
 
 If no runner can enforce a confined mode, the foreground call fails with `SANDBOX_UNAVAILABLE` and a background process records a runner-failure fact — never a silent unconfined run. A provider rejection is attributed to the confinement runner only when its `ENOENT`/`EACCES` path or syscall independently names `argv[0]`; otherwise it keeps the local executor's stage-neutral provider-failure semantics.
 
+Foreground and background executions retain registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) in every mode, including `danger-full-access`. The exclusions cannot be removed by approving a wider mode.
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -63,6 +63,8 @@ kind: "package-reference"
 
 如果没有 runner 能强制执行受限模式，前台调用以 `SANDBOX_UNAVAILABLE` 失败，后台进程则记录 runner 失败事实——绝不会静默无隔离运行。只有当 provider rejection 的 `ENOENT`/`EACCES` 路径或 syscall 独立指向 `argv[0]` 时，才把它归因于 confinement runner；其他 rejection 保持本地执行器不声明阶段的 provider-failure 语义。
 
+前台和后台执行在所有模式下均保留已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)，包括 `danger-full-access`。批准更宽松的模式不能移除这些排除项。
+
 -----
 
 <a id="understand-the-implementation"></a>

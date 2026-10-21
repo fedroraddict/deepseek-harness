@@ -56,6 +56,14 @@ With the provider mounted, a command runs under the mode you resolve per call. E
 
 An unsupported platform or an unusable runner fails closed: `confine()` rejects with `SANDBOX_UNAVAILABLE` and names the runner options for the platform, and the consumer surfaces that error rather than running the command unconfined. A runner that starts but refuses its profile is identified by its fatal stderr signature and exit code, so a broken sandbox is not mistaken for a denied command. The `runnerCommand` override is an operator assertion: it skips functional probes and assumes the configured runner implements the bwrap-compatible profile honestly.
 
+### Protecting host credentials
+
+`secretDirectories` defaults to `[]`. To enable protection, first place the credential document and its atomic-write staging files in an existing dedicated directory, set the credential provider's `path` to that document, and list the directory in this provider's `secretDirectories`. Do not list the whole harness home: profiles, dependencies, and other runtime files must remain outside the protected directory. This configuration does not move existing credentials. The [sandbox service](../sandbox/README.md#host-secret-exclusions) owns registration lifetime and provider obligations.
+
+The sandbox Bash and PowerShell executors, persistent shell terminals, one-shot and persistent Node PTC, Python PTC, local filesystem operations, and grep/glob retain these exclusions in every mode. Filesystem streaming uses a backpressured worker pipe. Approving `danger-full-access` does not expose the protected directory. Ordinary host subprocess consumers retain their existing API and authority. External subagents, local MCP stdio servers, stdio language servers, workspace change-summary Git commands, and SSH sandbox forwarding are refused because they cannot carry these exclusions.
+
+Bubblewrap masks each secret directory after workspace mounts; Seatbelt denies reads, writes, ancestor removal, and inspection of other processes. Bubblewrap refuses a policy that permits moving a protected directory's ancestors, including full access beneath user-writable ancestors. Landlock and the Windows ACL runner cannot enforce these read exclusions and fail closed when protection is configured. A custom runner must honor the appended Bubblewrap profile. Verify the selected providers and runtime layout before treating this configuration as credential custody.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,7 +80,7 @@ Selection is by platform first, probes second: each platform has a runner chain 
 
 ### Platform profiles
 
-The bwrap profile combines a read-only host root, a fresh `/dev`, and `/proc` from a private PID namespace — commands manage their descendants but cannot see host processes, so procfs magic links cannot bypass the mounts; `workspace-write` adds an ephemeral `/tmp` and a writable workspace bind. The [historical private-PID note](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md) records the boundary. Private process and device mounts are applied after workspace binds; a root workspace also receives its ephemeral `/tmp` after the root bind.
+Outside full-access mode, the bwrap profile combines a read-only host root, a fresh `/dev`, and `/proc` from a private PID namespace — commands manage their descendants but cannot see host processes, so procfs magic links cannot bypass the mounts; `workspace-write` adds an ephemeral `/tmp` and a writable workspace bind. The [historical private-PID note](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md) records the boundary. `preserveHostTemp: true` retains host temporary-file visibility for filesystem workers instead of masking `/tmp`; other backends retain their existing temporary-directory behavior. Private process and device mounts are applied after workspace binds; a root workspace also receives its ephemeral `/tmp` after the root bind.
 
 The `@deepseek-ai/node-addon-system/landlock-run` API supplies the platform launcher, functional probe, and grant vocabulary; this provider maps mode to grants only, keeping path resolution and probe parsing with the versioned binary.
 

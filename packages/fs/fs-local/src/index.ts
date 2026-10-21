@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-fs-local
  */
 
+import { assertNoHostSecretAccess, hostSecretDirectories } from '@deepseek-ai/dsh-sandbox'
 import { Context } from '@deepseek-ai/cordis'
 import { constants as bufferConstants } from 'node:buffer'
 import { once } from 'node:events'
@@ -39,10 +40,13 @@ import {
   streamWholeText,
   writeFileAtomic,
 } from './fsio.ts'
+import { isolatedFileOperation, isolatedFileStream } from './isolated.ts'
 import type { FsIoInternals } from './fsio.ts'
 
 /** Configuration for the local filesystem backend. */
 export interface Config {
+  /** Positive termination grace in milliseconds for host-secret filesystem workers; defaults to 1000. */
+  secretWorkerGraceMs?: number
   /** Base directory for relative paths. Defaults to `process.cwd()`. */
   cwd?: string
   /**
@@ -91,6 +95,7 @@ export class LocalFileSystem extends FileSystem {
 
   static Config: z<Config> = z.object({
     cwd: z.string().default(process.cwd()),
+    secretWorkerGraceMs: z.number().default(1000),
     diffBasisMaxBytes: z.number().default(DEFAULT_DIFF_BASIS_MAX_BYTES),
   })
 
@@ -105,11 +110,15 @@ export class LocalFileSystem extends FileSystem {
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
-    const resolved = config as ResolvedConfig
+    const resolved = { ...config, secretWorkerGraceMs: config.secretWorkerGraceMs ?? 1000 } as ResolvedConfig
     if (!Number.isSafeInteger(resolved.diffBasisMaxBytes)
       || resolved.diffBasisMaxBytes <= 0
       || resolved.diffBasisMaxBytes > MAX_DIFF_BASIS_BYTES) {
       throw new Error(`fs-local: diffBasisMaxBytes must be a positive safe integer no greater than ${MAX_DIFF_BASIS_BYTES}`)
+    }
+    if (!Number.isFinite(resolved.secretWorkerGraceMs)
+      || resolved.secretWorkerGraceMs <= 0 || resolved.secretWorkerGraceMs > 2_147_483_647) {
+      throw new Error('fs-local: secretWorkerGraceMs must be positive, finite, and no greater than 2147483647')
     }
     this.config = resolved
   }
@@ -134,6 +143,7 @@ export class LocalFileSystem extends FileSystem {
     if (opts?.signal?.aborted) throw new FsError('resolve aborted', 'FS_ABORTED')
     const local = await resolveLocalTarget(opts?.cwd ?? this.config.cwd, path)
     if (opts?.signal?.aborted) throw new FsError('resolve aborted', 'FS_ABORTED')
+    assertNoHostSecretAccess(this.ctx, local.targetKey)
     return { targetKey: local.targetKey, displayPath: local.displayPath }
   }
 
@@ -156,6 +166,8 @@ export class LocalFileSystem extends FileSystem {
 
   override async stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined> {
     if (signal?.aborted) throw new FsError('stat aborted', 'FS_ABORTED')
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'stat', [target], signal)
     const info = await probe(target.targetKey)
     if (signal?.aborted) throw new FsError('stat aborted', 'FS_ABORTED')
     if (!info) return undefined
@@ -166,6 +178,8 @@ export class LocalFileSystem extends FileSystem {
     if (signal?.aborted) throw new FsError('lstat aborted', 'FS_ABORTED')
     if (path.trim().length === 0) throw new FsError('file_path must be a non-empty string', 'FS_NOT_FOUND')
     const cwd = opts?.cwd ?? this.config.cwd
+    assertNoHostSecretAccess(this.ctx, localDisplayPath(cwd, path))
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'lstat', [path, opts], signal)
     const info = await probeNoFollow(localDisplayPath(cwd, path))
     if (signal?.aborted) throw new FsError('lstat aborted', 'FS_ABORTED')
     if (!info) return undefined
@@ -173,22 +187,34 @@ export class LocalFileSystem extends FileSystem {
   }
 
   override async readText(target: FsTarget, signal?: AbortSignal): Promise<string> {
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'readText', [target], signal)
     return readWholeText({ displayPath: target.displayPath, targetKey: target.targetKey }, signal)
   }
 
   override streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) {
+      return Promise.resolve(isolatedFileStream(this.ctx, this.config, target, signal))
+    }
     return Promise.resolve(streamWholeText({ displayPath: target.displayPath, targetKey: target.targetKey }, signal))
   }
 
   override async readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array> {
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'readBytes', [target, null, maxBytes], signal)
     return readWholeBytes({ displayPath: target.displayPath, targetKey: target.targetKey }, signal, maxBytes, this.internals)
   }
 
   override async readByteRange(target: FsTarget, range: { offset: number; length: number }, signal?: AbortSignal): Promise<Uint8Array> {
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'readByteRange', [target, range], signal)
     return readByteWindow({ displayPath: target.displayPath, targetKey: target.targetKey }, range, signal)
   }
 
   override async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
+    assertNoHostSecretAccess(this.ctx, target.targetKey)
+    if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'listDir', [target], signal)
     const entries = await listDirectory({ displayPath: target.displayPath, targetKey: target.targetKey }, signal)
     return entries.map(entry => ({
       name: entry.name,
@@ -206,6 +232,8 @@ export class LocalFileSystem extends FileSystem {
     signal?: AbortSignal,
   ): Promise<FsWriteOutcome> {
     return this.withLock(target.targetKey, async () => {
+      assertNoHostSecretAccess(this.ctx, target.targetKey)
+      if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'writeText', [target, content, expected], signal)
       const existing = await probe(target.targetKey)
       if (existing && existing.type !== 'file') {
         throw new FsError(`cannot write "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
@@ -261,6 +289,8 @@ export class LocalFileSystem extends FileSystem {
     signal?: AbortSignal,
   ): Promise<FsEditOutcome> {
     return this.withLock(target.targetKey, async () => {
+      assertNoHostSecretAccess(this.ctx, target.targetKey)
+      if (hostSecretDirectories(this.ctx).length > 0) return isolatedFileOperation(this.ctx, this.config, 'editText', [target, edit, expected], signal)
       const existing = await probe(target.targetKey)
       // Stale guard before literal matching: an edit based on an old read reports
       // FS_STALE_VERSION, not FS_EDIT_NOT_FOUND/FS_AMBIGUOUS_EDIT against newer content.

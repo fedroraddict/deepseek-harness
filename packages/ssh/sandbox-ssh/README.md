@@ -29,6 +29,8 @@ Mount this provider with the shared [`SSH connection`](../ssh/README.md), SSH fi
 
 Pass a complete `read-only` or `workspace-write` policy. The workspace is interpreted and canonicalized on the remote host. Consumers bypass `confine()` for `danger-full-access`; the connection does not invent an additional local/remote policy flag.
 
+This provider rejects registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) because the SSH protocol does not transport an execution-world exclusion registry. It never claims that remote argv protects caller-side secret directories.
+
 -----
 
 <a id="understand-the-implementation"></a>

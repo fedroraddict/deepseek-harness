@@ -95,6 +95,8 @@ PTC 消费方按 [dsh-tools](../../core/tools/README.zh.md#ptc-mode) 的说明�
 
 程序解析错误与抛出异常为 `exception`；截止到期为 `timeout`；取消为 `abort`；畸形或超量控制通信为 `protocol`；约束不可用为 `sandbox-unavailable`；进程提前退出或受管清理失败为 `worker-exit`。进程提供方保留与执行基底无关的失败名 `worker-exit`。有损完成值为 `invalid-output`，外层结果超限为 `output-limit`，并保留能容纳的日志前缀。无效或不支持的选项，以及资源释放后的调用，以调用方误用拒绝。
 
+单次和持久工作进程均保留已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)，包括解析后的模式为 `danger-full-access` 时。沙箱提供方必须实施排除，否则拒绝启动。
+
 -----
 
 <a id="understand-the-implementation"></a>

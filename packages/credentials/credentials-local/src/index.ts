@@ -39,7 +39,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { watch as chokidarWatch } from 'chokidar'
 import { mkdir, readFile, stat } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { Document, isMap, isScalar, parseDocument, type YAMLError } from 'yaml'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { canonicalizeWatchPath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -577,6 +577,7 @@ export class LocalCredentialProvider extends CredentialProvider {
       this.closed = true
       await this.operations
     }
+    this.spec.filename = join(await canonicalizeWatchPath(dirname(this.spec.filename)), basename(this.spec.filename))
     await this.loadInitial()
     if (!this.spec.watch) return
     const watcher = chokidarWatch(await canonicalizeWatchPath(this.spec.filename), {

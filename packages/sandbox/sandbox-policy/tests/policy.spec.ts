@@ -10,6 +10,7 @@ import { join, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { protectHostSecretDirectory } from '@deepseek-ai/dsh-sandbox'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import SandboxPolicyService, { SANDBOX_MODES, setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -168,6 +169,22 @@ describe('sandbox:policy request context', () => {
     await ctx.plugin(SandboxPolicyService, config)
     return ctx
   }
+
+  it.each(['read-only', 'workspace-write', 'danger-full-access'] as const)('reports mandatory secret exclusions in the logged %s context', async (mode) => {
+    const ctx = await promptMounted({ mode })
+    const vault = mkdtempSync(join(tmpdir(), 'dsh-policy-secrets-'))
+    try {
+      protectHostSecretDirectory(ctx, vault)
+      const context = await policyContext(ctx, session('protected-context', '/workspace'))
+      expect(context).toContain('Host-secret directories remain excluded from reads and writes in every mode')
+      expect(context).toContain('Escalation cannot remove these exclusions')
+      expect(context).not.toContain(vault)
+      expect(context).not.toContain('does not restrict file modifications')
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(vault, { recursive: true, force: true })
+    }
+  })
 
   it.each(['read-only', 'workspace-write', 'danger-full-access'] as const)('renders the exact %s policy without a capability inventory', async (mode) => {
     const ctx = await promptMounted({ mode, workspaceRoot: '/fallback' })

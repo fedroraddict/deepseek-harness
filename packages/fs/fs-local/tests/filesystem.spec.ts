@@ -167,6 +167,11 @@ describe('stat', () => {
 })
 
 describe('lstat', () => {
+  it.skipIf(process.platform === 'win32')('reports a final symlink cycle without following it when custody is unconfigured', async () => {
+    await symlink(join(dir, 'cycle'), join(dir, 'cycle'))
+    expect((await fs.lstat('cycle'))?.type).toBe('symlink')
+  })
+
   it.skipIf(process.platform !== 'win32')('uses the same native drive-relative paths as resolve', async () => {
     await writeFile(join(dir, 'created.txt'), 'native')
     const drive = parse(dir).root.slice(0, 2)

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `dsh-sandbox` to run a subprocess and everything it spawns under a per-call file-access policy. A command can run without writes (`read-only`), write only inside its workspace (`workspace-write`), or run unrestricted (`danger-full-access`). If the requested mode cannot be enforced, the call fails with `SANDBOX_UNAVAILABLE` instead of running unconfined. After a denied call, the model can request one strictly wider mode for human approval. This is same-world confinement: the process still shares the host kernel and filesystem; use a container, microVM, or remote executor when the whole environment must be isolated.
+Use `dsh-sandbox` to run a subprocess and everything it spawns under a per-call file-access policy. A command can run without writes (`read-only`), write only inside its workspace (`workspace-write`), or bypass mode restrictions (`danger-full-access`). If the requested mode cannot be enforced, the call fails with `SANDBOX_UNAVAILABLE` instead of running unconfined. After a denied call, the model can request one strictly wider mode for human approval. This is same-world confinement: the process still shares the host kernel and filesystem; use a container, microVM, or remote executor when the whole environment must be isolated.
 
 ## Table of Contents
 
@@ -57,7 +57,7 @@ The mode names the file effects a command may perform; enforcement completeness 
 |---|---|
 | `read-only` | Denies writes except required sinks such as `/dev/null` |
 | `workspace-write` | Allows writes under the workspace root plus a backend-defined temp area |
-| `danger-full-access` | Bypasses confinement; the consumer spawns its original argv |
+| `danger-full-access` | Bypasses mode restrictions; registered host-secret exclusions remain mandatory |
 
 Enforcement is reported per call: `full` means the backend governs every promised file effect, while `partial` means an active backend or older kernel ABI governs only a subset — the Windows ACL rung and older Landlock ABIs are the current partial cases, so a consumer that requires the absolute boundary can reject or surface them.
 
@@ -68,6 +68,15 @@ When a confined call is denied, the operation reports a denial marker naming the
 ### Fail-closed behavior
 
 When no backend can enforce the requested mode, the call fails with `SANDBOX_UNAVAILABLE` rather than running unconfined; the error text names the missing platform runner. A backend that fails after starting also reports a structured runner-failure signature, so a broken sandbox is distinguishable from a command failure.
+
+<a id="host-secret-exclusions"></a>
+### Host-secret exclusions
+
+Trusted host code can register an existing dedicated directory with `protectHostSecretDirectory(ctx, directory)` before model execution or filesystem access starts. The root-owned registration is shared by child realms and separately loaded package copies, remains for the application lifetime, and cannot be removed by mode escalation. Keep the directory at its registered location and keep its files free of symbolic links and hard-link aliases. Registration rejects existing aliases inside the directory. A failed registration blocks model tool dispatch for the remaining application lifetime, including when the plugin loader continues after the error.
+
+Model process consumers resolve `hostSecretExecutionPolicy(ctx, policy)` before deciding whether to call `confine()`. With registered directories, this returns a policy even for `danger-full-access`; a provider must exclude `hostSecretDirectories(ctx)` from reads and writes or reject the call. Replacement providers must implement this requirement in the same execution world. `assertNoHostSecretAccess()` rejects direct filesystem targets; filesystem syscalls also require kernel confinement to cover path changes after resolution. The [local provider](../sandbox-local/README.md) owns configuration and platform support.
+
+This protects the supported model execution providers. Host plugins and the generic subprocess service retain host authority; installing or exposing a tool that performs arbitrary host operations requires a separate authority review.
 
 -----
 
@@ -92,6 +101,7 @@ This section explains the design decisions behind the contract and points at the
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `SandboxProvider` service, mode/enforcement/policy types, fail-closed error |
 | [`src/escalation.ts`](src/escalation.ts) | Escalation vocabulary: wider-mode ladder, argument validation, denial and hint markers, approval choreography |
+| [`src/host-secrets.ts`](src/host-secrets.ts) | Application-lifetime secret-directory registration and model execution policy |
 | [`src/roots.ts`](src/roots.ts) | Writable-root derivation shared by the Seatbelt profile and the in-process fs fence |
 
 ### Escalation choreography
@@ -163,7 +173,7 @@ Append-only; escalation text follows the retained prefix and does not invalidate
 
 These limits define when the seam is a poor fit or needs special operational care. They are current package constraints, not a general sandbox comparison or a task backlog.
 
-- **File effects are the whole policy vocabulary** — the seam expresses no network, process, syscall, device, or credential restrictions.
+- **File effects are the whole policy vocabulary** — mode names express no network, syscall, or device policy; host-secret exclusions are a separate mandatory constraint.
 - **Same-world confinement only** — containers, microVMs, and remote execution require replacing capability implementations rather than adding a provider here.
 - **Denial reporting is a stderr dialect** — the seam returns backend signatures instead of a typed runtime denial channel, so consumers that need classification infer it from the child process's output.
 - **Runner diagnostics are in-band** — exit status plus stderr evidence cannot prove which process wrote a matching line, so a confined child that deliberately mimics its runner can cause a false availability or diagnostic attribution; this cannot bypass confinement, and an out-of-band runner-status channel is deferred.

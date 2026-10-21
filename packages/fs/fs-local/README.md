@@ -56,6 +56,8 @@ Read, listing, and mutation failures are typed `FsError`s with stable codes — 
 
 Chokidar observes one file or a directory's direct entries through OS events, without polling or recursive watching. Files use a filtered parent-directory watch, so readiness also covers creation of an initially missing file. File watches cover in-place writes, atomic replacement, deletion, and same-path recreation while the parent directory remains.
 
+When [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions) are registered, filesystem operations run in a fresh kernel-confined worker; both the sandbox and subprocess providers must be mounted in the same execution world. Cancellation and ending a text stream terminate and join that worker. Streaming preserves decoded chunks and pipe backpressure. `secretWorkerGraceMs` sets the positive termination grace in milliseconds (default `1000`, maximum `2147483647`). Keep this package and its dependencies outside the protected directories.
+
 -----
 
 <a id="understand-the-implementation"></a>

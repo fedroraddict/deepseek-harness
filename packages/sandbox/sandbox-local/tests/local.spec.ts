@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -496,4 +496,56 @@ it('keeps private process, device, and temp mounts after rebinding a root worksp
   expect(args.indexOf('--proc')).toBeGreaterThan(args.indexOf('--bind'))
   expect(args.indexOf('--dev')).toBeGreaterThan(args.indexOf('--bind'))
   expect(args.lastIndexOf('/tmp')).toBeGreaterThan(args.indexOf('--bind'))
+})
+
+it.each(['landlock', 'windows-acl'] as const)('refuses %s when registered secret directories require read exclusions', async (runner) => {
+  const vault = mkdtempSync(join(tmpdir(), 'dsh-unsupported-secret-'))
+  tempDirs.push(vault)
+  const { ctx, sandbox } = await setup({ secretDirectories: [vault] }, { chain: [runner] })
+  try {
+    await expect(sandbox.confine(['node'], RO)).rejects.toThrow(/cannot exclude host secret/)
+    await expect(sandbox.confine(['node'], { ...RO, mode: 'danger-full-access' })).rejects.toThrow(/cannot enforce full access/)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+it('keeps full-access file permissions while applying mandatory profile exclusions', () => {
+  const policy: SandboxPolicy = { mode: 'danger-full-access', workspaceRoot: '/' }
+  const args = bwrapProfileArgs(policy, ['/vault'])
+  expect(args.slice(0, 3)).toEqual(['--bind', '/', '/'])
+  expect(args.slice(-4)).toEqual(['--tmpfs', '/vault', '--remount-ro', '/vault'])
+  expect(args).not.toContain('/tmp')
+  const profile = seatbeltProfileArgs(policy, ['/vault'])[1]!
+  expect(profile).not.toContain('(deny file-write*)')
+  expect(profile).toContain('(deny file-read* file-write* (subpath "/vault"))')
+  expect(profile).toContain('(deny process-info* (target others))')
+})
+
+it('refuses writable secret ancestors for both built-in and custom Bubblewrap runners', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dsh-secret-ancestors-'))
+  tempDirs.push(directory)
+  const vault = join(directory, 'vault')
+  mkdirSync(vault)
+  for (const config of [{ secretDirectories: [vault] }, {
+    secretDirectories: [vault], runnerCommand: ['custom-bwrap'], runnerFailureSignatures: ['custom: rejected'],
+  }]) {
+    const { ctx, sandbox } = await setup(config, { chain: ['bwrap'] })
+    try {
+      await expect(sandbox.confine(['node'], { mode: 'danger-full-access', workspaceRoot: directory })).rejects.toThrow(/mutable ancestor/)
+      await expect(sandbox.confine(['node'], { mode: 'workspace-write', workspaceRoot: directory })).resolves.toHaveProperty('argv')
+      await expect(sandbox.confine(['node'], { mode: 'read-only', workspaceRoot: '/' })).resolves.toHaveProperty('argv')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  }
+})
+
+it('preserves the host temporary-file view for fixed filesystem workers', () => {
+  const args = bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: '/workspace', preserveHostTemp: true }, ['/vault'])
+  expect(args).not.toContain('/tmp')
+  expect(args).toContain('--ro-bind')
+  expect(args.slice(args.indexOf('--bind'), args.indexOf('--bind') + 3)).toEqual(['--bind', '/workspace', '/workspace'])
+  expect(seatbeltProfileArgs({ mode: 'workspace-write', workspaceRoot: '/workspace' }, ['/owner/vault'])[1])
+    .toContain('(deny file-write-unlink (literal "/owner"))')
 })

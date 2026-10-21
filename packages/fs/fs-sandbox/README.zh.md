@@ -49,6 +49,8 @@ kind: "package-reference"
 
 读取、列出、元数据操作与只读监听均与 `fs-local` 完全一致；变更围栏不限制观察。被拒绝的变更返回携带有效模式的 `FS_SANDBOX_DENIED` 错误；经工具，模型会看到 `[sandbox: file access denied under <mode> mode]` 及唯一一次获批更宽权限的重试提示，与 bash 的拒绝完全相同。获得批准升级的会话可以在该次调用中以严格更宽的模式重试同一操作。
 
+已登记的[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)通过继承的本地提供方作用于读取和变更，包括 `danger-full-access` 模式。
+
 -----
 
 <a id="understand-the-implementation"></a>

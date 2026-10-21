@@ -19,6 +19,7 @@ import type {
   LspProviderQuery,
   LspQueryResult,
 } from '@deepseek-ai/dsh-lsp'
+import { assertNoHostSecretExclusions } from '@deepseek-ai/dsh-sandbox'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { abortable, abortError } from './abort.ts'
 import { canonicalizeWorkspace, readHostSource } from './host.ts'
@@ -151,7 +152,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       setupAbort.signal.throwIfAborted()
       return new LocalLspProvider(
         providerId,
-        ctx.fs,
+        ctx,
         resolved,
         executable,
         spec => ctx.subprocess.spawn(spec),
@@ -228,7 +229,7 @@ class LocalLspProvider implements LspProvider {
 
   constructor(
     providerId: string,
-    private readonly fs: Context['fs'],
+    private readonly ctx: Context,
     private readonly config: ResolvedServerConfig,
     private readonly executable: string,
     private readonly spawner: ConnectionSpawner,
@@ -260,8 +261,9 @@ class LocalLspProvider implements LspProvider {
   async query(request: LspProviderQuery, signal?: AbortSignal): Promise<LspQueryResult> {
     // Honor an already-aborted signal before provider I/O so a canceled request never starts a server.
     this.assertActive(signal)
+    assertNoHostSecretExclusions(this.ctx, 'stdio language servers')
     const querySignal = this.querySignal(signal)
-    const workspaceResult = canonicalizeWorkspace(this.fs, request.workspaceRoot, querySignal)
+    const workspaceResult = canonicalizeWorkspace(this.ctx.fs, request.workspaceRoot, querySignal)
     const workspaceLookup = workspaceResult.then(() => undefined, () => undefined)
     this.workspaceLookups.add(workspaceLookup)
     let workspace: HostWorkspace
@@ -276,7 +278,7 @@ class LocalLspProvider implements LspProvider {
       this.assertActive(querySignal)
       // Read inside the workspace queue but before spawning: a queued query sees current bytes when
       // its turn starts, while an invalid source still cannot leave an idle process pooled.
-      const source = await readHostSource(this.fs, request.filePath, workspace, this.config.maxDocumentBytes, querySignal)
+      const source = await readHostSource(this.ctx.fs, request.filePath, workspace, this.config.maxDocumentBytes, querySignal)
       // Disposal may have snapshotted the instance map while host I/O was pending. Re-check before a
       // synchronous get-or-create so every spawned process remains owned by teardown.
       this.assertActive(querySignal)

@@ -14,16 +14,16 @@
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses mode confinement. Mandatory
+ * host-secret exclusions still apply. Network and process visibility are otherwise outside this vocabulary.
  */
 type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 ```
 
-只有前两种模式可以发送给提供方。`danger-full-access` 的消费方直接 spawn 原始 argv，不调用 `ctx.sandbox`。
+登记[宿主秘密目录排除](../../packages/sandbox/sandbox/README.zh.md#host-secret-exclusions)后，消费者在 `danger-full-access` 模式下仍调用提供方；提供方必须保留排除项，否则拒绝执行。没有已登记排除项时，完全访问的消费者直接启动原始 argv。
 
 ```ts type-equiv
-/** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
+/** A mode that restricts file writes independently of mandatory host-secret exclusions. */
 type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
 ```
 
@@ -53,6 +53,8 @@ interface SandboxExecutionPolicy {
   mode: SandboxMode
   /** Absolute root directory `workspace-write` may write under. */
   workspaceRoot: string
+  /** Keep host temporary files visible; workspace-write then grants only its explicit root on Bubblewrap. */
+  preserveHostTemp?: boolean
   /**
    * Opaque identity of the calling session (the branded `dsh-session`
    * SessionId). Backends key per-session state off it (e.g. windows-acl gives
@@ -76,7 +78,7 @@ interface SandboxPolicyRequest {
 }
 ```
 
-只有受约束的执行会到达 `ctx.sandbox`；传给提供方的策略在保留同一 root 的同时收窄模式。这使并发会话、消费方与一次性提权重试可以向同一提供方请求不同边界，而无需改变提供方状态。
+提供方接收已解析的模式和根目录；强制排除需要运行器时，也接收完全访问模式。这样，并发会话、消费者和单次提权重试可向相同提供方请求不同范围，而不修改提供方状态。
 
 ```ts type-equiv
 /**
@@ -87,10 +89,7 @@ interface SandboxPolicyRequest {
  * new call with a wider policy. Defaulting/resolution is an explicit step at
  * the consumer boundary; the provider treats the policy as fully specified.
  */
-interface SandboxPolicy extends SandboxExecutionPolicy {
-  /** The file-effect mode this execution runs under. */
-  mode: ConfinedSandboxMode
-}
+type SandboxPolicy = SandboxExecutionPolicy
 ```
 
 <a id="wrapped-argv-and-classification-dialects"></a>

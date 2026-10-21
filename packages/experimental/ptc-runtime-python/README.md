@@ -53,6 +53,8 @@ Required confinement that cannot be established returns `sandbox-unavailable`; t
 
 Host-side validation drops junk without throwing, so a malformed or forged frame never crashes the host process: `validateChildFrame` returns `undefined` for anything that does not rebuild cleanly, a non-number call id can never be echoed into a reply, and forged extra fields never ride along. A completion value that is not lossless JSON, or that exceeds the configured byte budget, is rejected explicitly (`non-lossless` / `over-budget`) rather than silently rounded or truncated. An fd-3 frame whose raw length exceeds the effective frame parse cap (64 MiB, or lower when the host's configured heap cannot safely parse a near-cap frame — see `hostFrameParseCeiling`) settles the run as a `worker-exit` (the receive path caps raw frames before `toString`/`JSON.parse` so a compact wide frame cannot decode to far more host memory than its wire bytes admitted).
 
+Python execution retains registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions), including when the resolved mode is `danger-full-access`. The sandbox provider must enforce the exclusions or reject startup.
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -57,6 +57,8 @@ A session's mode can be switched at runtime through a UI policy control or an ex
 
 An invalid configured mode is rejected when the plugin loads, so a typo fails loud instead of silently changing policy. A session without a cwd, and agentless calls, fall back to the configured workspace root; a call with an approved explicit mode uses that mode for exactly that call.
 
+When host-secret directories are registered, the logged `sandbox:policy` runtime-context section states that reads and writes remain excluded in every mode and escalation cannot remove the exclusions. The context does not enumerate secret paths.
+
 -----
 
 <a id="understand-the-implementation"></a>

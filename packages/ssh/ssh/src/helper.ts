@@ -11,7 +11,7 @@ import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local'
 import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
-import type { SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { z } from 'zod'
 import { SshRpcPeer, RemoteOperationError, SSH_MAX_PROCESS_HANDLES, SSH_MAX_TEXT_STREAMS, SSH_PROTOCOL_VERSION } from './protocol.ts'
 import { RemoteProcesses } from './helper-processes.ts'
@@ -150,7 +150,7 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
       const input = z.object({ argv: z.array(z.string()).min(1), policy: policySchema }).strict().parse(raw)
       const resolved = await policy(input.policy, signal)
       if (resolved.mode === 'danger-full-access') throw new Error('Unconfined argv does not need a sandbox wrapper')
-      return ctx.sandbox.confine(input.argv, resolved as SandboxPolicy, signal)
+      return ctx.sandbox.confine(input.argv, resolved, signal)
     }
     if (method === 'fs.resolve' || method === 'fs.lstat') {
       const input = z.object({ path: z.string(), cwd: remotePath.optional() }).strict().parse(raw)

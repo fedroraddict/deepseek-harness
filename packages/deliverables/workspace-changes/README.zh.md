@@ -95,6 +95,8 @@ git 通过 `subprocess` 能力运行，使用净化后的环境、`GIT_CONFIG_CO
 - 退化为整文件替换的对比携带两侧的全部行，最多两倍 `maxFileBytes`。
 - Windows 路径在 `path` 中保留原生分隔符；`display` 始终用斜杠分隔。
 
+配置[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)后，Git 快照不可用：仓库过滤器和辅助程序不能在缺少强制隔离时运行。文件工具捕获仍然可用。
+
 <a id="dev-note"></a>
 ### 开发备注
 

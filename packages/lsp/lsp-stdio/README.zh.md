@@ -148,6 +148,8 @@ kind: "package-reference"
 - **逐服务器与逐工作区串行化延迟**——共享同一个服务器与工作区的并行 agent 会在一个进程后排队；长生命周期工作区进程会占用内存直到释放。
 - **被强制杀死的 harness 会遗留语言服务器**——`initialize.processId: null` 取消了服务器侧的客户端 PID 监视，因此服务器只能由服务的优雅释放清理；被 SIGKILL 的 harness 会让它们继续运行，直到自行退出。
 
+配置[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)后，查询会在文件系统访问或服务器启动前被拒绝。语言服务器可能执行项目插件，目前尚不支持强制隔离。
+
 <a id="dev-note"></a>
 ### 开发备注
 

@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用 `dsh-sandbox`，可以让子进程及其派生的所有进程在逐调用文件访问策略下运行。命令可以禁止写入（`read-only`）、只写入工作区（`workspace-write`），或不受限制地运行（`danger-full-access`）。无法强制执行所请求的模式时，调用以 `SANDBOX_UNAVAILABLE` 失败，绝不会不受限制地运行。调用被拒绝后，模型可以请求一个严格更宽的模式，交由人类批准一次。这种限制只适用于与宿主共享内核和文件系统的进程；需要隔离整个环境时，请使用容器、microVM 或远程执行器。
+使用 `dsh-sandbox`，可以让子进程及其派生的所有进程在逐调用文件访问策略下运行。命令可以禁止写入（`read-only`）、只写入工作区（`workspace-write`），或绕过模式限制（`danger-full-access`）。无法强制执行所请求的模式时，调用以 `SANDBOX_UNAVAILABLE` 失败，绝不会不受限制地运行。调用被拒绝后，模型可以请求一个严格更宽的模式，交由人类批准一次。这种限制只适用于与宿主共享内核和文件系统的进程；需要隔离整个环境时，请使用容器、microVM 或远程执行器。
 
 ## 目录
 
@@ -57,7 +57,7 @@ kind: "package-reference"
 |---|---|
 | `read-only` | 拒绝写入，必需 sink（如 `/dev/null`）除外 |
 | `workspace-write` | 允许写入工作区根目录及后端定义的临时区域 |
-| `danger-full-access` | 绕过隔离；消费方直接 spawn 原始 argv |
+| `danger-full-access` | 绕过模式限制；已登记的宿主秘密目录仍受强制排除保护 |
 
 强制执行逐调用报告：`full` 表示后端管辖模式承诺的每个文件操作，`partial` 表示活动后端或较旧的内核 ABI 只管辖子集——Windows ACL 档与较旧的 Landlock ABI 是当前的部分强制执行情形，需要绝对边界的消费方可以拒绝或向上暴露它们。
 
@@ -68,6 +68,15 @@ kind: "package-reference"
 ### 故障关闭行为
 
 没有后端能强制执行所请求的模式时，调用以 `SANDBOX_UNAVAILABLE` 失败，而不是不受限制地运行；错误文本会指明缺失的平台 runner。启动后失败的后端还会报告结构化的 runner 失败签名，因此损坏的沙箱可以与命令失败区分开。
+
+<a id="host-secret-exclusions"></a>
+### 宿主秘密目录排除
+
+受信任的宿主代码可在模型执行或文件系统访问开始前，使用 `protectHostSecretDirectory(ctx, directory)` 登记现有的专用目录。子 realm 和单独加载的包副本共享根上下文持有的登记记录，记录在应用生命周期内保留，模式提权不能移除它。目录必须保持在登记位置，内部文件不得使用符号链接或硬链接别名。登记会拒绝目录内已有的别名。登记失败后，应用剩余生命周期内的模型工具调度会被阻止，即使插件加载器在报错后继续运行。
+
+模型进程消费者在决定是否调用 `confine()` 前，先解析 `hostSecretExecutionPolicy(ctx, policy)`。存在已登记目录时，即使模式为 `danger-full-access`，也会返回策略；提供方必须禁止读写 `hostSecretDirectories(ctx)`，否则拒绝调用。替代提供方必须在相同执行环境中实现此要求。`assertNoHostSecretAccess()` 拒绝直接文件系统目标；文件系统调用还需要内核约束，以防路径在解析后发生变化。[本地提供方](../sandbox-local/README.zh.md) 负责配置和平台支持。
+
+此保护覆盖受支持的模型执行提供方。宿主插件和通用子进程服务保留宿主权限；安装或暴露可执行任意宿主操作的工具时，需要单独审查其权限。
 
 -----
 
@@ -92,6 +101,7 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`SandboxProvider` 服务、模式/强制执行/策略类型、故障关闭错误 |
 | [`src/escalation.ts`](src/escalation.ts) | 升权词汇：更宽模式阶梯、参数校验、拒绝与提示标记、审批编排 |
+| [`src/host-secrets.ts`](src/host-secrets.ts) | 应用生命周期内的秘密目录登记和模型执行策略 |
 | [`src/roots.ts`](src/roots.ts) | 可写根目录推导，Seatbelt profile 与进程内 fs 栅栏共享 |
 
 ### 升权编排
@@ -163,7 +173,7 @@ sandbox mode "<mode>" is requested but no sandbox backend is usable on this host
 
 这些限制说明该 seam 何时不合适，或何时需要特别运维。它们是当前包约束，不是通用沙箱对比或任务积压。
 
-- **文件操作是完整的策略词汇**——该 seam 不表达网络、进程、系统调用、设备或凭据限制。
+- **文件操作是完整的策略词汇**——模式名称不表达网络、系统调用或设备策略；宿主秘密目录排除是独立的强制限制。
 - **只支持与宿主共享文件系统和内核的限制**——容器、microVM 与远程执行需要替换能力实现，而不是在此添加提供方。
 - **拒绝报告是一种 stderr 方言**——该 seam 返回后端签名，而非类型化运行时拒绝通道，需要分类的消费方必须从子进程输出推断。
 - **Runner 诊断使用带内通道**——退出状态与 stderr 证据无法证明匹配行由哪个进程写入，因此故意模仿 runner 的受限子进程可能造成错误的可用性或诊断归因；这无法绕过隔离，带外 runner 状态通道暂缓实现。

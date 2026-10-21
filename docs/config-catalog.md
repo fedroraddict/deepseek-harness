@@ -415,7 +415,7 @@ export interface Config {
 
 - `inject`: `subprocess` · `sandbox` · `sandboxPolicy`
 - `refs`: [`LocalConfig`](#deepseek-aidsh-bash-local)
-- `source`: [`packages/shell/bash-sandbox/src/index.ts:36`](../packages/shell/bash-sandbox/src/index.ts)
+- `source`: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -1376,11 +1376,13 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-fs-local`
 
-- `source`: [`packages/fs/fs-local/src/index.ts:45`](../packages/fs/fs-local/src/index.ts)
+- `source`: [`packages/fs/fs-local/src/index.ts:47`](../packages/fs/fs-local/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the local filesystem backend. */
 export interface Config {
+  /** Positive termination grace in milliseconds for host-secret filesystem workers; defaults to 1000. */
+  secretWorkerGraceMs?: number
   /** Base directory for relative paths. Defaults to `process.cwd()`. */
   cwd?: string
   /**
@@ -2583,7 +2585,7 @@ export interface Config {
 
 - `inject`: `subprocess` · `sandbox` · `sandboxPolicy`
 - `refs`: [`LocalConfig`](#deepseek-aidsh-pwsh-local)
-- `source`: [`packages/shell/pwsh-sandbox/src/index.ts:40`](../packages/shell/pwsh-sandbox/src/index.ts)
+- `source`: [`packages/shell/pwsh-sandbox/src/index.ts:39`](../packages/shell/pwsh-sandbox/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -2644,6 +2646,8 @@ export interface Config {
 ```ts config-catalog
 /** Plugin config. All optional — `static Config` supplies the defaults. */
 export interface Config {
+  /** Additional absolute host-only secret directories; model execution cannot read or write them. */
+  secretDirectories?: string[]
   /**
    * Override the runner argv; bwrap-compatible profile arguments are appended. A
    * non-empty override asserts full enforcement and skips built-in selection and
@@ -2675,7 +2679,7 @@ export interface Config {
 
 - `inject`: `sessionProjections`
 - `refs`: [`SandboxMode`](subsystems/sandbox.md)
-- `source`: [`packages/sandbox/sandbox-policy/src/index.ts:71`](../packages/sandbox/sandbox-policy/src/index.ts)
+- `source`: [`packages/sandbox/sandbox-policy/src/index.ts:72`](../packages/sandbox/sandbox-policy/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -3325,7 +3329,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 - `inject`: `workingDirectory`
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/subagent/subagent/src/index.ts:186`](../packages/subagent/subagent/src/index.ts)
+- `source`: [`packages/subagent/subagent/src/index.ts:187`](../packages/subagent/subagent/src/index.ts)
 
 ```ts config-catalog
 /** Host configuration for continuable subagent capacity. */

@@ -25,6 +25,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { z as zod } from 'zod'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-agent'
+import { hostSecretDirectories } from '@deepseek-ai/dsh-sandbox'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
@@ -144,9 +145,13 @@ export class SandboxPolicyService extends Service {
         order: scope.systemPrompt.getContextOrder('SANDBOX_POLICY'),
         text: (context) => {
           const session = context.agent?.session
-          return session === undefined
-            ? ''
-            : renderPolicyContext(this.resolve({ session }))
+          if (session === undefined) return ''
+          const policy = this.resolve({ session })
+          if (hostSecretDirectories(scope).length === 0) return renderPolicyContext(policy)
+          const description = policy.mode === 'danger-full-access'
+            ? 'Current DSH file policy: danger-full-access. Mode write restrictions are disabled.'
+            : renderPolicyContext(policy)
+          return `${description} Host-secret directories remain excluded from reads and writes in every mode. Escalation cannot remove these exclusions.`
         },
       })
     })

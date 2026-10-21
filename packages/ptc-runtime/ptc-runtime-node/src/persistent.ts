@@ -5,7 +5,7 @@ import { isAbsolute } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { PtcRunRequest, PtcRunSpec, PtcRunResult, PtcRunSandbox, PtcRunFailure, PtcBindingNamespace, PtcJsonValue } from '@deepseek-ai/dsh-ptc-runtime'
 import { clampTimeout } from '@deepseek-ai/dsh-timeout'
-import { SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure } from '@deepseek-ai/dsh-sandbox'
+import { hostSecretExecutionPolicy, SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SubprocessHandle, SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
 import type { PolicyProcesses } from './policy-processes.ts'
@@ -187,7 +187,8 @@ class Kernel {
     if (this.closed) return
     const argv = [executable, `--max-old-space-size=${this.config.maxOldGenerationSizeMb}`, ...bootstrapArgs(this.ctx.fs, this.config.launch, this.config.maxMessageBytes, true)]
     const policy = this.policy
-    this.confined = policy.mode === 'danger-full-access' ? undefined : await this.ctx.sandbox.confine(argv, { ...policy, mode: policy.mode }, this.controller.signal)
+    const confinement = hostSecretExecutionPolicy(this.ctx, policy)
+    this.confined = confinement === undefined ? undefined : await this.ctx.sandbox.confine(argv, confinement, this.controller.signal)
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- Cancellation can close the kernel during confinement.
     if (this.closed) return
     const env: NodeJS.ProcessEnv = Object.fromEntries(Object.keys(process.env)

@@ -95,6 +95,8 @@ Omitting `timeoutMs` uses the configured elapsed default; numeric requests are v
 
 Program parse errors and thrown exceptions are `exception`; deadline expiry is `timeout`; cancellation is `abort`; malformed or excessive control traffic is `protocol`; unavailable confinement is `sandbox-unavailable`; early process exit or failed managed cleanup is `worker-exit`. The substrate-independent failure name remains `worker-exit` for process providers. Lossy completions are `invalid-output`, and an oversized outer result is `output-limit`, retaining the fitting log prefix. Invalid or unsupported options and calls after disposal reject as caller misuse.
 
+One-shot and persistent workers retain registered [host-secret exclusions](../../sandbox/sandbox/README.md#host-secret-exclusions), including when the resolved mode is `danger-full-access`. The sandbox provider must enforce the exclusions or reject startup.
+
 -----
 
 <a id="understand-the-implementation"></a>

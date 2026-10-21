@@ -19,6 +19,7 @@
  * @module @deepseek-ai/dsh-tool-fs-search/search-core
  */
 
+import { hostSecretExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join, parse, relative, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -191,8 +192,8 @@ export function resolveRgPath(): Promise<string> {
  * (`@deepseek-ai/dsh-tool-call-timeout-policy`) and caller cancellation terminate the
  * process tree.
  *
- * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
- * is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
+ * Registered host secrets require read-only kernel confinement. `--no-config`
+ * is always prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
  * binary) can otherwise inject `--pre` and make ripgrep execute an arbitrary
  * preprocessor for every matched file. The collect dispositions are the
  * seam's diagnostic-tail shape (no spill files): the tools never read a raw
@@ -221,7 +222,7 @@ export function resolveRgPath(): Promise<string> {
  */
 export async function runRipgrep(
   ctx: Context,
-  exec: ToolExecution,
+  exec: Pick<ToolExecution, 'agent' | 'signal'>,
   toolName: string,
   argv: readonly string[],
   rawOutputMaxBytes: number,
@@ -236,8 +237,13 @@ export async function runRipgrep(
     : await ctx.workingDirectory.ensure(exec.agent, exec.signal)
   let handle: SubprocessHandle
   try {
+    const command = [await resolveRgPath(), '--no-config', ...argv]
+    const policy = hostSecretExecutionPolicy(ctx, { mode: 'danger-full-access', workspaceRoot: workdir })
+    const confined = policy === undefined
+      ? undefined
+      : await ctx.sandbox.confine(command, { ...policy, mode: 'read-only' }, exec.signal)
     handle = ctx.subprocess.spawn({
-      argv: [await resolveRgPath(), '--no-config', ...argv],
+      argv: confined?.argv ?? command,
       cwd: workdir,
       stdio: {
         stdin: 'ignore',

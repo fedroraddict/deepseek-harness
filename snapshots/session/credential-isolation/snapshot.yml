@@ -1,0 +1,9 @@
+version: 1
+scenario: credential-isolation
+profile: headless
+composition: credential-isolation
+recording: authored
+platform: posix
+header:
+  class: credential-isolation
+  pin: true

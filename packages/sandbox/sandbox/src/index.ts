@@ -20,16 +20,17 @@ export {
 } from './escalation.ts'
 export type { EscalationApproval, EscalationApprover, EscalationOutcome, EscalationRequest } from './escalation.ts'
 export { canonicalPath, writableRoots } from './roots.ts'
+export { assertNoHostSecretExclusions, protectHostSecretDirectory, hostSecretDirectories, assertNoHostSecretAccess, hostSecretExecutionPolicy } from './host-secrets.ts'
 
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses mode confinement. Mandatory
+ * host-secret exclusions still apply. Network and process visibility are otherwise outside this vocabulary.
  */
 export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 
-/** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
+/** A mode that restricts file writes independently of mandatory host-secret exclusions. */
 export type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
 
 /**
@@ -42,6 +43,8 @@ export interface SandboxExecutionPolicy {
   mode: SandboxMode
   /** Absolute root directory `workspace-write` may write under. */
   workspaceRoot: string
+  /** Keep host temporary files visible; workspace-write then grants only its explicit root on Bubblewrap. */
+  preserveHostTemp?: boolean
   /**
    * Opaque identity of the calling session (the branded `dsh-session`
    * SessionId). Backends key per-session state off it (e.g. windows-acl gives
@@ -67,10 +70,7 @@ export type SandboxEnforcement = 'full' | 'partial'
  * new call with a wider policy. Defaulting/resolution is an explicit step at
  * the consumer boundary; the provider treats the policy as fully specified.
  */
-export interface SandboxPolicy extends SandboxExecutionPolicy {
-  /** The file-effect mode this execution runs under. */
-  mode: ConfinedSandboxMode
-}
+export type SandboxPolicy = SandboxExecutionPolicy
 
 /**
  * Evidence that identifies a sandbox runner failing before it executes the
@@ -130,9 +130,11 @@ export const SANDBOX_UNAVAILABLE = 'SANDBOX_UNAVAILABLE'
  * channel.
  */
 export class SandboxUnavailableError extends HarnessError {
-  constructor(mode: ConfinedSandboxMode, detail?: string) {
+  constructor(mode: SandboxMode, detail?: string) {
     super(
-      `sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; `
+      mode === 'danger-full-access'
+        ? 'mandatory host-secret protection cannot be enforced on this host; refusing to run the command' + (detail === undefined ? '' : `: ${detail}`)
+        : `sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; `
       + 'refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing '
       + 'kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL '
       + 'restricted-token runner can start (Windows) — otherwise switch the consumer to '

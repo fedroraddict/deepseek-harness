@@ -78,6 +78,8 @@ Node 部署在受支持的 macOS、Linux 与 Windows 目标上获得 `@vscode/ri
 
 搜索失败携带本包定义的错误码：`SEARCH_INVALID_PATTERN`（ripgrep 拒绝正则或 glob）、`SEARCH_FAILED`（启动失败、目标不可访问、信号终止或 `--json` 输出格式错误）、`SEARCH_RAW_OUTPUT_OVERFLOW`（原始输出超过上限）与 `SEARCH_ABORTED`（协作式超时或调用方取消）。退出 0 表示成功且有结果，退出 1 表示成功的空搜索；模型参数错误仍是普通工具参数错误。
 
+登记[宿主秘密目录排除](../../sandbox/sandbox/README.zh.md#host-secret-exclusions)后，grep 和 glob 先通过只读内核沙箱约束 ripgrep，再启动进程。相同执行环境必须提供 `ctx.sandbox`；提供方缺失或无法实施保护时，搜索会失败，不会暴露受保护文件。
+
 -----
 
 <a id="understand-the-implementation"></a>
