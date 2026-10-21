@@ -4,6 +4,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import type { SessionOpenConfig } from '../../history-open-config.ts'
 import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import {
@@ -252,12 +253,14 @@ export class ClientSessions implements ISessions {
   /**
    * @param ctx - client root context (scope fibers mount under it).
    * @param remote - generated Remote namespaces shared with every Session.
+   * @param open - opening-history-window timing; omitted fields use the client defaults.
    */
   constructor(
     private readonly rootCtx: Context,
     remote: SessionRemotes,
+    open: SessionOpenConfig = {},
   ) {
-    this.manager = new SessionManager(remote)
+    this.manager = new SessionManager(remote, open)
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, phase: 'pending', projectionsBySession: {},
     })

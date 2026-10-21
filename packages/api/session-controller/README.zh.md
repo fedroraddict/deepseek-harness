@@ -99,6 +99,10 @@ GUI 模型选择要求确切提供方／模型对出现在可用目录中；不�
 |---|---:|---|
 | `nativeOpen` | 平台探测 | 是否能把 Session 工作区路径交给原生桌面打开器 |
 | `listWorkSliceMs` | `16` | 列表工作时间片，单位为毫秒，取正整数；在完整条目之间检查 |
+| `open.openWarnMs` | `10000` | Client 对未到达的历史首帧窗口发出告警前的延迟 |
+| `open.openTimeoutMs` | `30000` | 打开历史窗口的截止时间；超时以 `session/open-timeout` 失败并进入 `error` 状态 |
+
+两个延迟均接受不超过 `2147483647` 的正整数毫秒值，且只约束初始历史窗口。告警不会取消打开；超时会取消对应的 follow 流，并允许后续重新打开。窗口装载后，后续实时帧不受静默时限限制。Host 将这些设置下发到所提供的页面；其他 Client 使用默认值。
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-api-session-controller)是所有受支持字段及其 JSDoc 的完整来源。
 

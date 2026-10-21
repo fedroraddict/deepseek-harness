@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-09-21-session-history-open-deadline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-session-history-open-deadline.md
+/agent-note-a-session-s-opening-history-window-has-a-deadline:
+  en: 33475e090fd94757
+  zh: c5ef155637da3d02
+/agent-note-a-session-s-opening-history-window-has-a-deadline/problem:
+  en: 38896a661e173f9a
+  zh: 9d13ab5dbd4e0edb
+/agent-note-a-session-s-opening-history-window-has-a-deadline/decision:
+  en: 54967f7554ed1bb5
+  zh: e335b834fb01494b
+/agent-note-a-session-s-opening-history-window-has-a-deadline/alternatives-considered:
+  en: 7b1d11726701ef3c
+  zh: a29714075991d5fb
+/agent-note-a-session-s-opening-history-window-has-a-deadline/consequences:
+  en: 386d815e3daaba0e
+  zh: 1cf331d4ae93089b
+/agent-note-a-session-s-opening-history-window-has-a-deadline/verification:
+  en: b55712e9c4470386
+  zh: 397338a70aa085da
+/agent-note-a-session-s-opening-history-window-has-a-deadline/related:
+  en: 680587a39dc1abff
+  zh: 8efc73249657803a

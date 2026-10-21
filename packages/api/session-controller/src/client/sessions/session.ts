@@ -8,6 +8,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
 import { SessionLogOffset, SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
+import { resolveSessionOpenConfig, type SessionOpenConfig } from '../../history-open-config.ts'
 import { SessionEventStream } from '../transport.ts'
 import type { SessionJournalChange } from '../transport.ts'
 import type {
@@ -73,6 +74,10 @@ export interface SessionOptions {
   address?: SubagentAddress
   /** Whether the exact direct parent Agent is available in Host summaries; absent until known. */
   parentAvailable?: boolean
+  /**
+   * Opening-history-window timing; absent, the Client defaults apply.
+   */
+  open?: Required<SessionOpenConfig>
   /**
    * Publish each accepted prompt to the Manager, including after this Session
    * object is replaced. Acceptance converts display state, but does not
@@ -147,6 +152,8 @@ export class Session implements SessionFace {
   }>()
   /** Owns the addressed page/follow lifecycle while this Session is open. */
   private events: SessionEventStream | undefined
+  /** Opening-window bounds applied to every `doOpen` pass; defaults for bare construction. */
+  private readonly openConfig: Required<SessionOpenConfig>
 
   /**
    * Per-session projection value store (push model; see the session-projection
@@ -189,6 +196,7 @@ export class Session implements SessionFace {
     this.projections = options.projections ?? new ProjectionValueStore()
     this.address = options.address
     this.parentAvailable = options.parentAvailable
+    this.openConfig = options.open ?? resolveSessionOpenConfig()
     this.notifier = new Notifier(() => {
       this.snapshotCache = this.buildSnapshot()
     })
@@ -628,7 +636,7 @@ export class Session implements SessionFace {
     })
     this.events = events
     try {
-      await events.open(HISTORY_PAGE_OPTIONS)
+      await this.openWindow(events)
       if (generation !== this.openGeneration || this.events !== events) return
       this.openState = 'open'
     } catch (error) {
@@ -639,6 +647,50 @@ export class Session implements SessionFace {
       this.openError = error
     } finally {
       if (generation === this.openGeneration) this.notifier.markDirty()
+    }
+  }
+
+  /**
+   * Bound only this generation's initial history window; later live frames may
+   * remain silent indefinitely. Timeout cancels the abandoned follow before
+   * publishing the failure so a later open owns a fresh stream.
+   * @param events - the opening event stream this pass owns.
+   * @returns after the opening window is installed.
+   * @throws {RemoteError} session/open-timeout when no opening frame arrives in time.
+   */
+  private async openWindow(events: SessionEventStream): Promise<void> {
+    const { openTimeoutMs, openWarnMs } = this.openConfig
+    const opening = events.open(HISTORY_PAGE_OPTIONS)
+    let timedOut: RemoteError | undefined
+    let warnTimer: ReturnType<typeof setTimeout> | undefined
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<never>((_resolve, reject) => {
+      if (openWarnMs < openTimeoutMs) {
+        warnTimer = setTimeout(() => {
+          console.warn(
+            `[session-controller] session "${this.sessionId}" history open has not delivered its opening window after ${String(openWarnMs)}ms`,
+          )
+        }, openWarnMs)
+      }
+      deadlineTimer = setTimeout(() => {
+        timedOut = new RemoteError(
+          'session/open-timeout',
+          `session history opening window did not arrive within ${String(openTimeoutMs)}ms`,
+          { sessionId: this.sessionId },
+        )
+        reject(timedOut)
+      }, openTimeoutMs)
+    })
+    try {
+      await Promise.race([opening, deadline])
+    } catch (error: unknown) {
+      if (error === timedOut) {
+        await events.dispose()
+      }
+      throw error
+    } finally {
+      clearTimeout(warnTimer)
+      clearTimeout(deadlineTimer)
     }
   }
 

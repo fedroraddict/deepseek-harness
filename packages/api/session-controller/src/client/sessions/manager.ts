@@ -4,6 +4,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionSeq, type SessionId, type SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import { resolveSessionOpenConfig, type SessionOpenConfig } from '../../history-open-config.ts'
 import type {
   SessionControlBaseline,
   SessionControlFrame,
@@ -122,8 +123,13 @@ export class SessionManager {
     this.listSnapshotCache = this.buildListSnapshot()
   })
 
-  /** @param remote - generated Remote namespaces used by catalog and history readers. */
-  constructor(private readonly remote: SessionRemotes) {
+  /** Validated opening timing every created Session inherits. */
+  private readonly open: Required<SessionOpenConfig>
+
+  /** @param remote - generated Remote namespaces used by catalog and history readers.
+   *  @param open - opening-history-window timing; omitted fields use the client defaults. */
+  constructor(private readonly remote: SessionRemotes, open: SessionOpenConfig = {}) {
+    this.open = resolveSessionOpenConfig(open)
     this.listSnapshotCache = this.buildListSnapshot()
   }
 
@@ -275,6 +281,7 @@ export class SessionManager {
       ? undefined
       : this.agentAvailable(address.parentSessionId)
     return new Session(sessionId, this.remote, {
+      open: this.open,
       ...(address === undefined ? {} : {
         address,
         ...parentAvailable === undefined ? {} : { parentAvailable },

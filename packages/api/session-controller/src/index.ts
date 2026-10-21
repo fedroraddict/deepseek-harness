@@ -9,6 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { errorChain, ReasoningEffortId, type MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativeFileApplication, openNativeAssociatedPath, revealNativePath } from '@deepseek-ai/dsh-native-command'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
@@ -24,6 +25,7 @@ import {
 } from './agent.ts'
 import { SessionCommandController, hasPromptContent } from './commands.ts'
 import { SessionControlController } from './control.ts'
+import { resolveSessionOpenConfig, SessionOpenConfigSchema, type SessionOpenConfig } from './history-open-config.ts'
 import { SessionHistoryController } from './history.ts'
 import { SessionFileReferences } from './file-references.ts'
 import { ApiSessionList } from './list.ts'
@@ -96,6 +98,12 @@ export interface Config {
   readonly nativeOpen?: boolean
   /** Positive integral milliseconds of list work before yielding between complete rows. */
   readonly listWorkSliceMs?: number
+  /**
+   * Opening history-window timing, injected into each served page. The Client
+   * bounds the wait for a Session's opening frame with it; defaults apply when
+   * the page is not served by this Host.
+   */
+  readonly open?: SessionOpenConfig
 }
 
 /** Deployment policy after schema defaults have been applied. */
@@ -135,6 +143,7 @@ export class SessionController extends TypertRemoteService {
   static Config: z<Config, ResolvedConfig> = z.object({
     nativeOpen: z.boolean(),
     listWorkSliceMs: z.natural().min(1).default(16),
+    open: SessionOpenConfigSchema.default({}),
   })
 
   private readonly agents: ApiSessionAgentController
@@ -151,7 +160,7 @@ export class SessionController extends TypertRemoteService {
 
   /**
    * @param ctx - Host context containing the Session capability assembly.
-   * @param config - native-opener and list-scheduling deployment policy.
+   * @param config - native-opener, list-scheduling, and opening-timing deployment policy.
    * @param internals - host integrations replaceable by direct unit tests.
    */
   constructor(ctx: Context, config: Config, internals: SessionControllerInternals = {}) {
@@ -187,6 +196,14 @@ export class SessionController extends TypertRemoteService {
     // until it is restored; what it still runs is stopped by the owners that
     // answer the Workspace registry's archive-admission events.
     ctx.plugin(ArchivedSessionGate)
+    // The Client bounds its own wait for a Session's opening frame, so the
+    // policy travels with the page rather than over the Remote API.
+    const open = resolveSessionOpenConfig(config.open)
+    ctx.inject(['webServer'], (webCtx) => {
+      webCtx.on('webserver/index-inject', (table) => {
+        table.push({ kind: 'global', name: '__DSH_SESSION_OPEN__', value: open })
+      })
+    })
 
     ctx.on('session/created', (session) => {
       ctx.emit('api-session/added', this.listState.summaryFor(session))

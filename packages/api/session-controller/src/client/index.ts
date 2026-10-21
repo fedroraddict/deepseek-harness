@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-agent/types'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-file-upload/client'
 import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
+import { resolveSessionOpenConfig } from '../history-open-config.ts'
 import { createSessionControlStream } from './transport.ts'
 import { ClientSessions } from './sessions/service.ts'
 import type { SessionRemotes } from './sessions/remotes.ts'
@@ -105,6 +106,11 @@ export const inject = [
   'remote.subagents',
 ]
 
+/** Page global carrying the served opening timing; absent outside a Host-served page. */
+interface SessionOpenGlobal {
+  __DSH_SESSION_OPEN__?: unknown
+}
+
 /**
  * Install Client Session state and its reconnecting control stream.
  * @param ctx - Client Cordis context.
@@ -112,7 +118,8 @@ export const inject = [
 export function apply(ctx: Context): void {
   const remotes = ctx.remote as unknown as SessionRemotes
   const connection = ctx.get('connection') as ConnectionHandle
-  const sessions = new ClientSessions(ctx, remotes)
+  const open = resolveSessionOpenConfig((globalThis as SessionOpenGlobal).__DSH_SESSION_OPEN__)
+  const sessions = new ClientSessions(ctx, remotes, open)
   ctx.remote.$on('api-session/added', (summary) => { sessions.handleSessionAdded(summary) })
   ctx.remote.$on('api-session/removed', (sessionId) => { sessions.handleSessionRemoved(sessionId) })
   ctx.remote.$on('api-session/status', (sessionId, running) => {

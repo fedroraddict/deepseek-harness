@@ -16,6 +16,7 @@
     "src/control.ts",
     "src/file-references.ts",
     "src/history.ts",
+    "src/history-open-config.ts",
     "src/list.ts",
     "src/media-references.ts",
     "src/model-selection-projection.ts",
@@ -115,6 +116,9 @@
     },
     {
       "path": "../../session/working-directory"
+    },
+    {
+      "path": "../../host/webserver"
     }
   ]
 }

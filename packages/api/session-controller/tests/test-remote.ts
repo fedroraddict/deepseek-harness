@@ -33,6 +33,7 @@ import {
 } from '@deepseek-ai/dsh-typert-protocol'
 import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
 import SessionController from '../src/index.ts'
+import type { SessionOpenConfig } from '../src/history-open-config.ts'
 import type {
   ModelCatalog,
   SessionAttachmentRequest,
@@ -98,6 +99,7 @@ export interface TestSessionRemoteDefaults {
   readonly defaultModelSelection: () => AgentModelSelection
   readonly cwd: string
   readonly nativeOpen?: boolean
+  readonly open?: SessionOpenConfig
   readonly saveDefaultModelSelection?: (selection: AgentModelSelection) => void | Promise<void>
   readonly openPath?: (path: string, signal: AbortSignal) => Promise<void>
   readonly fileApplications?: SessionControllerInternals['fileApplications']
@@ -299,6 +301,7 @@ function installControllers(
       ctx,
       {
         ...defaults.nativeOpen === undefined ? {} : { nativeOpen: defaults.nativeOpen },
+        ...defaults.open === undefined ? {} : { open: defaults.open },
       },
       {
         ...defaults.openPath === undefined ? {} : { openPath: defaults.openPath },

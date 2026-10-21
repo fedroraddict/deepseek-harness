@@ -222,7 +222,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-session-controller`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `fileUploads` · `fs` · `llm` · `remoteAccess` · `sessions` · `sessionProjections` · `sessionQuery` · `typert` · `workspaceRegistry`
-- `source`: [`packages/api/session-controller/src/index.ts:94`](../packages/api/session-controller/src/index.ts)
+- `source`: [`packages/api/session-controller/src/index.ts:96`](../packages/api/session-controller/src/index.ts)
 
 ```ts config-catalog
 /** Session Controller deployment policy. */
@@ -231,6 +231,31 @@ export interface Config {
   readonly nativeOpen?: boolean
   /** Positive integral milliseconds of list work before yielding between complete rows. */
   readonly listWorkSliceMs?: number
+  /**
+   * Opening history-window timing, injected into each served page. The Client
+   * bounds the wait for a Session's opening frame with it; defaults apply when
+   * the page is not served by this Host.
+   */
+  readonly open?: SessionOpenConfig
+}
+
+/**
+ * Timing for the opening frame of one Session's history window. Both bounds
+ * apply to that frame only: later live frames of an open window are unbounded,
+ * so a long silence mid-transcript is never cut by this policy.
+ */
+export interface SessionOpenConfig {
+  /**
+   * Delay before reporting an opening window that has not arrived, without
+   * cancelling it. Default: 10000. Never observed when the window arrives, the
+   * open fails, or {@link openTimeoutMs} expires first.
+   */
+  openWarnMs?: number
+  /**
+   * Deadline in ms for a Session's opening window before the open fails into
+   * the `error` state. Default: 30000.
+   */
+  openTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-session-controller -->

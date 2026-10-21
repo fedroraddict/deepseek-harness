@@ -99,6 +99,10 @@ A successful `selectModel` response acknowledges the Session-local selection wit
 |---|---:|---|
 | `nativeOpen` | platform-detected | Whether Session workspace paths can be handed to a native desktop opener |
 | `listWorkSliceMs` | `16` | Positive integral list-work time slice in milliseconds; checks occur between complete rows |
+| `open.openWarnMs` | `10000` | Delay before the Client warns that an opening history window has not arrived |
+| `open.openTimeoutMs` | `30000` | Deadline before the opening fails with `session/open-timeout` and enters the `error` state |
+
+Both delays accept positive integral milliseconds up to `2147483647` and cover only the initial history window. A warning does not cancel the open; a timeout cancels its follow stream and permits a later open to retry. Once the window is installed, later live frames have no silence deadline. The Host supplies these settings to served pages; other Clients use the defaults.
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-api-session-controller) is the exhaustive source for accepted fields and their JSDoc.
 
