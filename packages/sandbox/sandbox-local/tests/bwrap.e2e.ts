@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, readlinkSync, statSync, rmSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -104,6 +104,32 @@ describe.skipIf(!bwrapUsable)('sandbox-local: real bwrap confinement', () => {
       expect(existsSync(target)).toBe(false)
     },
   )
+
+  it('root workspace-write retains private procfs, fresh devices, and ephemeral temp files', async () => {
+    const sandbox = await provider()
+    const hostNamespace = readlinkSync('/proc/self/ns/pid')
+    const namespace = await runConfined(sandbox, 'readlink /proc/self/ns/pid /proc/1/ns/pid', { mode: 'workspace-write', workspaceRoot: '/' })
+    expect(namespace.result.error).toBeUndefined()
+    expect(namespace.result.signal).toBeNull()
+    expect(namespace.result.status).toBe(0)
+    const [selfNamespace, initNamespace] = namespace.result.stdout.trim().split('\n')
+    expect(selfNamespace).not.toBe(hostNamespace)
+    expect(initNamespace).toBe(selfNamespace)
+    const devices = await runConfined(sandbox, `${JSON.stringify(process.execPath)} -p "require('node:fs').statSync('/dev').dev"`, { mode: 'workspace-write', workspaceRoot: '/' })
+    expect(devices.result.error).toBeUndefined()
+    expect(devices.result.signal).toBeNull()
+    expect(devices.result.status).toBe(0)
+    expect(Number(devices.result.stdout.trim())).not.toBe(statSync('/dev').dev)
+    const scratch = await tempDir('/tmp')
+    const target = join(scratch, 'private.txt')
+    const command = `mkdir -p ${JSON.stringify(scratch)}; printf private > ${JSON.stringify(target)}; cat ${JSON.stringify(target)}`
+    const privateFiles = await runConfined(sandbox, command, { mode: 'workspace-write', workspaceRoot: '/' })
+    expect(privateFiles.result.error).toBeUndefined()
+    expect(privateFiles.result.signal).toBeNull()
+    expect(privateFiles.result.status).toBe(0)
+    expect(privateFiles.result.stdout).toBe('private')
+    expect(existsSync(target)).toBe(false)
+  })
 
   it('keeps descendants observable and controllable inside the private PID namespace', async () => {
     const workdir = await tempDir(homedir())

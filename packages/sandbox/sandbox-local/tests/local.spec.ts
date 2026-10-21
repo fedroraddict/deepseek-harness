@@ -74,13 +74,13 @@ const SEATBELT_RO_PROFILE = '(version 1) (allow default) (deny file-write*) (all
 
 describe('profile dialects', () => {
   it('bwrap read-only: whole tree read-only with fresh /dev and private PID-scoped /proc, no writable mounts', () => {
-    expect(bwrapProfileArgs(RO)).toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent'])
+    expect(bwrapProfileArgs(RO)).toEqual(['--ro-bind', '/', '/', '--unshare-pid', '--die-with-parent', '--dev', '/dev', '--proc', '/proc'])
   })
 
   it('bwrap workspace-write: adds an ephemeral /tmp and rebinds the workspace root', () => {
     expect(bwrapProfileArgs(WW)).toEqual([
-      '--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent',
-      '--tmpfs', '/tmp', '--bind', '/ws', '/ws',
+      '--ro-bind', '/', '/', '--unshare-pid', '--die-with-parent',
+      '--tmpfs', '/tmp', '--bind', '/ws', '/ws', '--dev', '/dev', '--proc', '/proc',
     ])
   })
 
@@ -489,4 +489,11 @@ describe('the windows-acl probe (runner invocation contract)', () => {
     const confined = await sandbox.confine(['true'], RO)
     expect(confined.argv.slice(0, 2)).toEqual([process.execPath, builtEntry])
   })
+})
+
+it('keeps private process, device, and temp mounts after rebinding a root workspace', () => {
+  const args = bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: '/' })
+  expect(args.indexOf('--proc')).toBeGreaterThan(args.indexOf('--bind'))
+  expect(args.indexOf('--dev')).toBeGreaterThan(args.indexOf('--bind'))
+  expect(args.lastIndexOf('/tmp')).toBeGreaterThan(args.indexOf('--bind'))
 })

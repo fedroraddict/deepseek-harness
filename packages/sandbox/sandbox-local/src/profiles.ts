@@ -14,11 +14,14 @@ import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
  * @returns profile arguments before the trailing separator and command argv.
  */
 export function bwrapProfileArgs(policy: SandboxPolicy): string[] {
-  const args = ['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent']
+  const args = ['--ro-bind', '/', '/', '--unshare-pid', '--die-with-parent']
   if (policy.mode === 'workspace-write') {
-    args.push('--tmpfs', '/tmp')
+    if (policy.workspaceRoot !== '/') args.push('--tmpfs', '/tmp')
     args.push('--bind', policy.workspaceRoot, policy.workspaceRoot)
+    if (policy.workspaceRoot === '/') args.push('--tmpfs', '/tmp')
   }
+  // A workspace bind must not replace private process or device mounts.
+  args.push('--dev', '/dev', '--proc', '/proc')
   return args
 }
 
